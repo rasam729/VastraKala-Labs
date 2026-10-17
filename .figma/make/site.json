@@ -1,0 +1,10 @@
+{
+  "description": "An interactive platform teaching Indian fashion design from basics to advanced techniques, blending pattern drafting, color theory, and traditional textiles.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
