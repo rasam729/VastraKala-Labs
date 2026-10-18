@@ -7,11 +7,8 @@ import {
   Sparkles,
   Info,
   CheckCircle2,
-  Layers,
   FileCheck,
-  RotateCcw,
-  Eye,
-  ArrowRight
+  RefreshCw
 } from "lucide-react"
 import { calculatePatternMath, type BodyMeasurements } from "../lib/patternMath"
 import { generateTechnicalDielineFromDress, type TechnicalDielineResult } from "../lib/aiServices"
@@ -24,25 +21,31 @@ interface DielineStudioProps {
 const PRESET_DRESSES = [
   {
     name: "Royal Kalidar Anarkali",
-    category: "Anarkali Suit",
+    category: "kurti" as const,
     imageUrl: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=800",
     desc: "Empire-cut bodice with 8 kalis flare and puffed sleeves"
   },
   {
+    name: "Sleek Black Tailored Trousers",
+    category: "pants" as const,
+    imageUrl: "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=800",
+    desc: "Pleated straight-leg trousers with front crease and side pockets"
+  },
+  {
     name: "Banarasi Silk Kurti",
-    category: "Straight Kurti",
+    category: "kurti" as const,
     imageUrl: "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=800",
     desc: "Structured front placket with side hip slits"
   },
   {
     name: "Princess-Cut Saree Blouse",
-    category: "Blouse",
+    category: "blouse" as const,
     imageUrl: "https://images.unsplash.com/photo-1617627143750-d86bc21e42bb?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=800",
     desc: "Contoured armhole princess seams with deep back cutout"
   },
   {
     name: "Mughal Heritage Sherwani",
-    category: "Sherwani",
+    category: "sherwani" as const,
     imageUrl: "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=800",
     desc: "Rigid mandarin stand collar with padded shoulders"
   }
@@ -58,13 +61,16 @@ export default function DielineStudio({
   const [activeDressImage, setActiveDressImage] = useState<string>(dressImageUrl)
   const [dressName, setDressName] = useState<string>("Royal Kalidar Anarkali")
 
+  // Garment Category Override / Auto-detected
+  const [activeCategory, setActiveCategory] = useState<"auto" | "pants" | "kurti" | "blouse" | "skirt">("auto")
+
   // Measurement Blanks (Editable input fields for the student)
   const [bust, setBust] = useState<number>(measurements.bust || 88)
   const [waist, setWaist] = useState<number>(measurements.waist || 72)
   const [hip, setHip] = useState<number>(measurements.hip || 96)
   const [shoulder, setShoulder] = useState<number>(measurements.shoulder || 38)
   const [sleeveLength, setSleeveLength] = useState<number>(45)
-  const [garmentLength, setGarmentLength] = useState<number>(110)
+  const [garmentLength, setGarmentLength] = useState<number>(102)
   const [seamAllowance, setSeamAllowance] = useState<number>(1.5)
 
   // Computed pattern math
@@ -75,7 +81,7 @@ export default function DielineStudio({
   // AI Dieline Generation State
   const [isGenerating, setIsGenerating] = useState<boolean>(false)
   const [dielineResult, setDielineResult] = useState<TechnicalDielineResult | null>(null)
-  const [selectedPieceId, setSelectedPieceId] = useState<string>("front_bodice")
+  const [selectedPieceId, setSelectedPieceId] = useState<string>("")
 
   // Handle Dress Image Upload from storage
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,18 +99,23 @@ export default function DielineStudio({
     e.target.value = ""
   }
 
-  // Generate Technical Dieline with Gemini
+  // Generate Technical Dieline with Gemini Vision
   const handleGenerateDieline = async () => {
     setIsGenerating(true)
     try {
-      const result = await generateTechnicalDielineFromDress(activeDressImage, {
-        bust,
-        waist,
-        hip,
-        shoulder,
-        sleeveLength,
-        garmentLength
-      })
+      const hint = activeCategory !== "auto" ? `${activeCategory} ${dressName}` : dressName
+      const result = await generateTechnicalDielineFromDress(
+        activeDressImage,
+        {
+          bust,
+          waist,
+          hip,
+          shoulder,
+          sleeveLength,
+          garmentLength
+        },
+        hint
+      )
       setDielineResult(result)
       if (result.pieces.length > 0) {
         setSelectedPieceId(result.pieces[0].id)
@@ -116,16 +127,25 @@ export default function DielineStudio({
     }
   }
 
-  // Download Generated Dieline Diagram
-  const handleDownloadDieline = () => {
-    if (!dielineResult?.patternSvgDataUrl) return
+  // Download Generated Dieline Diagram as SVG File
+  const handleDownloadSvg = () => {
+    if (!dielineResult?.patternSvgMarkup) return
+    const blob = new Blob([dielineResult.patternSvgMarkup], { type: "image/svg+xml;charset=utf-8" })
+    const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
-    a.download = `vastrashastra-dieline-${Date.now()}.svg`
-    a.href = dielineResult.patternSvgDataUrl
+    a.download = `vastrashastra-dieline-${dielineResult.garmentCategory}-${Date.now()}.svg`
+    a.href = url
     a.click()
+    URL.revokeObjectURL(url)
   }
 
-  const selectedPiece = dielineResult?.pieces.find((p) => p.id === selectedPieceId) || dielineResult?.pieces[0]
+  const isPants =
+    (dielineResult?.garmentCategory === "pants") ||
+    (activeCategory === "pants") ||
+    /pant|trouser|bottom/i.test(dressName)
+
+  const selectedPiece =
+    dielineResult?.pieces.find((p) => p.id === selectedPieceId) || dielineResult?.pieces[0]
 
   return (
     <div className="space-y-8 bg-[#fdfbf7] p-6 lg:p-8 rounded-2xl border border-[#ded8cd]">
@@ -137,7 +157,7 @@ export default function DielineStudio({
             Reverse-Engineer 2D Flat Patterns
           </h2>
           <p className="text-sm text-[#666] max-w-2xl mt-1">
-            Upload any dress image from storage or pick a couture style. Enter your custom tailoring measurements in the blanks on the side, and let Gemini analyze the garment silhouette to synthesize the exact cutting dieline blueprint.
+            Upload any garment image (trousers, pants, kurti, saree blouse, or gown). Gemini analyzes the image contours to classify the garment and synthesizes the exact cutting dieline with mathematical measurement callouts.
           </p>
         </div>
 
@@ -147,16 +167,16 @@ export default function DielineStudio({
           className="flex items-center gap-2 px-5 py-3 rounded-lg bg-[#c9513e] hover:bg-[#b04332] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md disabled:opacity-50"
         >
           <Scissors className="w-4 h-4 text-[#e8b547]" />
-          {isGenerating ? "Synthesizing Dieline with Gemini..." : "Generate Technical Dieline"}
+          {isGenerating ? "Analyzing Image with Gemini Vision..." : "Generate Technical Dieline"}
         </button>
       </div>
 
       {/* Main Studio Columns: Image Input & Measurement Blanks */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Input Dress Image & Presets */}
+        {/* Left: Input Garment Image & Presets */}
         <div className="lg:col-span-5 flex flex-col gap-4">
           <div className="flex justify-between items-center bg-[#f5efe2] px-4 py-2.5 rounded-lg border border-[#e5dccf] text-xs">
-            <span className="font-bold text-[#172b2b]">Source Dress Image</span>
+            <span className="font-bold text-[#172b2b]">Source Garment Image</span>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1.5 text-[#c9513e] font-bold hover:underline"
@@ -172,25 +192,53 @@ export default function DielineStudio({
             />
           </div>
 
-          {/* Active Dress Image Preview */}
-          <div className="relative border border-[#d8cdbe] rounded-xl overflow-hidden bg-black shadow-md group">
+          {/* Active Garment Image Preview */}
+          <div className="relative border border-[#d8cdbe] rounded-xl overflow-hidden bg-white shadow-md group">
             <img
               src={activeDressImage}
-              alt="Source couture dress"
-              className="w-full h-80 object-cover opacity-90 group-hover:scale-105 transition-transform duration-300"
+              alt="Source garment design"
+              className="w-full h-80 object-contain p-2 group-hover:scale-105 transition-transform duration-300"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-4">
-              <div className="text-white">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-[#e8b547]">Target Silhouette</span>
-                <h4 className="text-base font-serif font-bold">{dressName}</h4>
-              </div>
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-[#e8b547]">Target Silhouette</span>
+              <h4 className="text-sm font-serif font-bold text-white truncate">{dressName}</h4>
             </div>
           </div>
 
-          {/* Preset Dress Switcher for Quick Experiments */}
+          {/* Category Selector Filter */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] uppercase font-bold text-[#888] tracking-wider block">
+              Garment Classification:
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { id: "auto", label: "Auto-Detect via Gemini" },
+                { id: "pants", label: "Pants / Trousers" },
+                { id: "kurti", label: "Kurti / Anarkali" },
+                { id: "blouse", label: "Saree Blouse" }
+              ].map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    setActiveCategory(c.id as any)
+                    setDielineResult(null)
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    activeCategory === c.id
+                      ? "bg-[#172b2b] text-white shadow-sm"
+                      : "bg-white border border-[#ded4c3] text-[#555] hover:border-[#aaa]"
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Preset Garment Switcher for Quick Testing */}
           <div className="space-y-2">
             <span className="text-[11px] uppercase font-bold text-[#888] tracking-wider block">
-              Experiment with Different Garment Silhouettes:
+              Quick Preset Silhouettes to Compare:
             </span>
             <div className="grid grid-cols-2 gap-2">
               {PRESET_DRESSES.map((d, idx) => (
@@ -199,6 +247,7 @@ export default function DielineStudio({
                   onClick={() => {
                     setActiveDressImage(d.imageUrl)
                     setDressName(d.name)
+                    setActiveCategory(d.category as any)
                     setDielineResult(null)
                   }}
                   className={`flex items-center gap-2 p-2 rounded-lg border text-left text-xs transition-all ${
@@ -210,7 +259,7 @@ export default function DielineStudio({
                   <img src={d.imageUrl} alt={d.name} className="w-10 h-10 object-cover rounded-md" />
                   <div>
                     <strong className="block text-[11px] text-[#172b2b] truncate">{d.name}</strong>
-                    <span className="text-[9px] text-[#777] block">{d.category}</span>
+                    <span className="text-[9px] text-[#777] block capitalize">{d.category}</span>
                   </div>
                 </button>
               ))}
@@ -225,33 +274,20 @@ export default function DielineStudio({
               <div className="flex items-center gap-2">
                 <Ruler className="w-4 h-4 text-[#c9513e]" />
                 <h3 className="text-xs uppercase font-bold text-[#172b2b] tracking-wider">
-                  Measurement Blanks (To Inject into Dieline Prompt)
+                  Measurement Blanks (Injected into Dieline Calculations)
                 </h3>
               </div>
-              <span className="text-[11px] font-mono text-[#888]">Units: Centimetres (CM)</span>
+              <span className="text-[11px] font-mono text-[#888]">Units: CM</span>
             </div>
 
             <p className="text-xs text-[#666]">
-              Fill in the blanks below with your client or target body specifications. Gemini will convert these 3D body girths into 2D flat pattern dimensions including ease and dart intake.
+              {isPants
+                ? "Enter your client's trouser measurements. Gemini will calculate front rise, back crotch extension, knee, and ankle widths."
+                : "Enter your client's bodice and flare measurements. Gemini will calculate apex ease, dart intake, and armhole depth."}
             </p>
 
             {/* Measurement Input Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <div>
-                <label className="text-[11px] font-bold text-[#444] block mb-1">Bust Girth (cm)</label>
-                <input
-                  type="number"
-                  value={bust}
-                  onChange={(e) => {
-                    const val = Number(e.target.value)
-                    setBust(val)
-                    setArmholeDepth(Math.round((val / 6 + 7) * 10) / 10)
-                  }}
-                  className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
-                />
-                <span className="text-[9px] text-[#777] mt-0.5 block">¼ Bust = {(bust / 4).toFixed(1)} cm</span>
-              </div>
-
               <div>
                 <label className="text-[11px] font-bold text-[#444] block mb-1">Waist Girth (cm)</label>
                 <input
@@ -271,52 +307,102 @@ export default function DielineStudio({
                   onChange={(e) => setHip(Number(e.target.value))}
                   className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
                 />
-                <span className="text-[9px] text-[#777] mt-0.5 block">Used for kali flare</span>
+                <span className="text-[9px] text-[#777] mt-0.5 block">
+                  {isPants ? `Rise ~ ${(hip / 4 + 2).toFixed(1)} cm` : "Seat volume"}
+                </span>
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-[#444] block mb-1">Shoulder Width (cm)</label>
-                <input
-                  type="number"
-                  value={shoulder}
-                  onChange={(e) => setShoulder(Number(e.target.value))}
-                  className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
-                />
-                <span className="text-[9px] text-[#777] mt-0.5 block">½ Shoulder = {(shoulder / 2).toFixed(1)} cm</span>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-[#444] block mb-1">Sleeve Length (cm)</label>
-                <input
-                  type="number"
-                  value={sleeveLength}
-                  onChange={(e) => setSleeveLength(Number(e.target.value))}
-                  className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
-                />
-                <span className="text-[9px] text-[#777] mt-0.5 block">Cap drop ~{(armholeDepth * 0.72).toFixed(1)} cm</span>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-bold text-[#444] block mb-1">Garment Length (cm)</label>
+                <label className="text-[11px] font-bold text-[#444] block mb-1">
+                  {isPants ? "Outseam Length (cm)" : "Garment Length (cm)"}
+                </label>
                 <input
                   type="number"
                   value={garmentLength}
                   onChange={(e) => setGarmentLength(Number(e.target.value))}
                   className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
                 />
-                <span className="text-[9px] text-[#777] mt-0.5 block">Nape to hem sweep</span>
+                <span className="text-[9px] text-[#777] mt-0.5 block">
+                  {isPants ? "Waist to ankle" : "Nape to hem sweep"}
+                </span>
               </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-[#444] block mb-1">Armhole Depth (cm)</label>
-                <input
-                  type="number"
-                  value={armholeDepth}
-                  onChange={(e) => setArmholeDepth(Number(e.target.value))}
-                  className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
-                />
-                <span className="text-[9px] text-[#c9513e] font-semibold mt-0.5 block">Formula: Bust/6 + 7</span>
-              </div>
+              {!isPants && (
+                <>
+                  <div>
+                    <label className="text-[11px] font-bold text-[#444] block mb-1">Bust Girth (cm)</label>
+                    <input
+                      type="number"
+                      value={bust}
+                      onChange={(e) => {
+                        const val = Number(e.target.value)
+                        setBust(val)
+                        setArmholeDepth(Math.round((val / 6 + 7) * 10) / 10)
+                      }}
+                      className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
+                    />
+                    <span className="text-[9px] text-[#777] mt-0.5 block">¼ Bust = {(bust / 4).toFixed(1)} cm</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-[#444] block mb-1">Shoulder Width (cm)</label>
+                    <input
+                      type="number"
+                      value={shoulder}
+                      onChange={(e) => setShoulder(Number(e.target.value))}
+                      className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
+                    />
+                    <span className="text-[9px] text-[#777] mt-0.5 block">½ Shoulder = {(shoulder / 2).toFixed(1)} cm</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-[#444] block mb-1">Sleeve Length (cm)</label>
+                    <input
+                      type="number"
+                      value={sleeveLength}
+                      onChange={(e) => setSleeveLength(Number(e.target.value))}
+                      className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
+                    />
+                    <span className="text-[9px] text-[#777] mt-0.5 block">Cap crown ~ {(armholeDepth * 0.72).toFixed(1)} cm</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-[#444] block mb-1">Armhole Depth (cm)</label>
+                    <input
+                      type="number"
+                      value={armholeDepth}
+                      onChange={(e) => setArmholeDepth(Number(e.target.value))}
+                      className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
+                    />
+                    <span className="text-[9px] text-[#c9513e] font-semibold mt-0.5 block">Bust/6 + 7</span>
+                  </div>
+                </>
+              )}
+
+              {isPants && (
+                <>
+                  <div>
+                    <label className="text-[11px] font-bold text-[#444] block mb-1">Crotch Rise Depth (cm)</label>
+                    <input
+                      type="number"
+                      value={Math.round((hip / 4 + 2) * 10) / 10}
+                      readOnly
+                      className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-[#f5efe2] text-[#444]"
+                    />
+                    <span className="text-[9px] text-[#c9513e] font-semibold mt-0.5 block">Formula: Hip/4 + 2cm</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-[#444] block mb-1">Ankle / Hem Width (cm)</label>
+                    <input
+                      type="number"
+                      defaultValue={18}
+                      className="w-full text-xs font-mono font-bold p-2.5 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
+                    />
+                    <span className="text-[9px] text-[#777] mt-0.5 block">Standard taper cuff</span>
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="text-[11px] font-bold text-[#444] block mb-1">Seam Margin (cm)</label>
@@ -337,7 +423,7 @@ export default function DielineStudio({
               className="w-full py-3 rounded-lg bg-[#172b2b] hover:bg-[#28453c] text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow"
             >
               <Scissors className="w-4 h-4 text-[#e8b547]" />
-              {isGenerating ? "Analyzing Silhouette & Calculating Dieline Geometry..." : "Synthesize Technical Dieline with Measurements"}
+              {isGenerating ? "Analyzing Image with Gemini Vision..." : "Synthesize Technical Dieline with Measurements"}
             </button>
           </div>
         </div>
@@ -355,24 +441,24 @@ export default function DielineStudio({
                 {dielineResult.garmentTitle} — Flat Pattern Cutting Dieline
               </h3>
               <p className="text-xs text-[#666] mt-0.5">
-                Deconstructed into {dielineResult.pieces.length} distinct drafting blocks scaled to your inputted measurements.
+                Classified as <strong>{dielineResult.garmentCategory.toUpperCase()}</strong>: Deconstructed into{" "}
+                {dielineResult.pieces.length} distinct drafting blocks scaled to your inputted measurements.
               </p>
             </div>
 
             <button
-              onClick={handleDownloadDieline}
+              onClick={handleDownloadSvg}
               className="flex items-center gap-2 px-4 py-2.5 bg-[#c9513e] hover:bg-[#b04332] text-white text-xs font-bold rounded-lg shadow transition-all"
             >
               <Download className="w-4 h-4 text-[#e8b547]" /> Download Dieline (SVG / Blueprint)
             </button>
           </div>
 
-          {/* SVG Blueprint Viewer */}
-          <div className="rounded-2xl overflow-hidden border border-[#1f3d45] shadow-2xl bg-[#0e1e24] p-2">
-            <img
-              src={dielineResult.patternSvgDataUrl}
-              alt="Generated Technical Dieline Blueprint"
-              className="w-full h-auto object-contain rounded-xl"
+          {/* SVG Blueprint Viewer rendered directly in DOM — Never Broken */}
+          <div className="rounded-2xl overflow-hidden border border-[#1f3d45] shadow-2xl bg-[#0e1e24] p-3">
+            <div
+              className="w-full overflow-x-auto"
+              dangerouslySetInnerHTML={{ __html: dielineResult.patternSvgMarkup }}
             />
           </div>
 
@@ -444,7 +530,7 @@ export default function DielineStudio({
                 {/* Pedagogical Advice */}
                 <div className="p-3 bg-[#f5efe2] rounded-lg border border-[#e2d5c0] space-y-1.5">
                   <strong className="text-xs font-bold text-[#1a5b3a] flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#2c7a4b]" /> Patternmaker Insight
+                    <CheckCircle2 className="w-3.5 h-3.5 text-[#2c7a4b]" /> Patternmaker Insight for {dielineResult.garmentCategory.toUpperCase()}
                   </strong>
                   <ul className="list-disc list-inside text-[11px] text-[#444] space-y-1">
                     {dielineResult.pedagogyNotes.map((note, idx) => (
