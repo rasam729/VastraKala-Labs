@@ -1070,6 +1070,10 @@ function AppInner() {
       <header className="site-header">
         <a className="brand" href="#top" aria-label="VastraKala Labs home" onClick={(event) => { event.preventDefault(); goHome() }}>
           <BrandLogo variant="header" />
+          <div className="brand-text">
+            <span className="brand-title">Vastra<span className="brand-highlight">Kala</span><span className="brand-sub">Labs</span></span>
+            <small className="brand-tagline">The Science &amp; Soul of Indian Couture</small>
+          </div>
         </a>
         <nav className={menuOpen ? "nav-links open" : "nav-links"} aria-label="Primary navigation">
           <a className={route === "ai-studio" ? "active" : ""} href="#ai-studio" onClick={(event) => { event.preventDefault(); navigate("ai-studio") }}>AI Studio</a>
@@ -1334,6 +1338,10 @@ function AppInner() {
         <div className="footer-brand">
           <a className="brand light-brand" href="#top">
             <BrandLogo variant="footer" />
+            <div className="brand-text">
+              <span className="brand-title">Vastra<span className="brand-highlight">Kala</span><span className="brand-sub" style={{ color: "#e8b547" }}>Labs</span></span>
+              <small className="brand-tagline">The Science &amp; Soul of Indian Couture</small>
+            </div>
           </a>
           <p>A digital school for India&apos;s fashion design language.</p>
         </div>
