@@ -8,6 +8,7 @@ import PlacementTest from "./components/PlacementTest"
 import LoginModal from "./components/LoginModal"
 import LearningPathView from "./components/LearningPathView"
 import { AuthProvider, useAuth, getDefaultPath } from "./lib/auth"
+import StitchChatbot from "./components/StitchChatbot"
 
 // Scroll-based fade-up observer hook
 function useScrollReveal() {
@@ -66,11 +67,11 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   )
 }
 
-/** Brand logo — uses transparent SVG asset, no white-box artifact */
+/** Brand logo — uses VK-Logo.png */
 function BrandLogo({ variant = "header" }: { variant?: "header" | "footer" }) {
   return (
     <img
-      src="/logo.svg"
+      src="/VK-Logo.png"
       alt="VastraKala Labs"
       className={variant === "footer" ? "brand-logo brand-logo-footer" : "brand-logo"}
     />
@@ -1340,6 +1341,9 @@ function AppInner() {
         <div className="footer-links"><a href="#ai-studio">AI Studio</a><a href="#progress">Progress</a><a href="#history">History</a><a href="#resources">Resources</a></div>
         <p className="copyright">© 2025 VastraKala Labs. Crafted with care in India.</p>
       </footer>
+
+      {/* Stitch AI Atelier Mentor Chatbot */}
+      <StitchChatbot currentRoute={route} />
     </div>
   )
 }
