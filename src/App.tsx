@@ -4,6 +4,10 @@ import ResourceLibraryView from "./components/ResourceLibraryView"
 import ModeSelector from "./components/ModeSelector"
 import TestModeRunner from "./components/TestModeRunner"
 import AttemptHistoryView from "./components/AttemptHistoryView"
+import PlacementTest from "./components/PlacementTest"
+import LoginModal from "./components/LoginModal"
+import LearningPathView from "./components/LearningPathView"
+import { AuthProvider, useAuth, getDefaultPath } from "./lib/auth"
 
 // Scroll-based fade-up observer hook
 function useScrollReveal() {
@@ -267,160 +271,6 @@ function ProgressRing({ value, label, size = "large" }: { value: number; label: 
     <div className={`progress-ring ${size}`} style={{ "--progress": `${value * 3.6}deg` } as React.CSSProperties}>
       <div><strong>{value}%</strong><span>{label}</span></div>
     </div>
-  )
-}
-
-function StudentDashboard({ navigate }: { navigate: (path: string) => void }) {
-  const [openLevel, setOpenLevel] = useState<number>(() => {
-    const saved = localStorage.getItem("vk-open-level")
-    return saved !== null ? Number(saved) : 1
-  })
-
-  const setLevel = (idx: number) => {
-    setOpenLevel(idx)
-    localStorage.setItem("vk-open-level", String(idx))
-  }
-
-  // Live course progress from localStorage
-  const courseProgressList = useMemo(() =>
-    courses.map((c) => {
-      const done = getCourseProgress(c.slug, c.units.length).filter(Boolean).length
-      return Math.round((done / c.units.length) * 100)
-    })
-  , [])
-  const overallPct = Math.round(courseProgressList.reduce((a, b) => a + b, 0) / courses.length)
-  const totalUnits = courses.reduce((a, c) => a + c.units.length, 0)
-  const completedUnits = courses.reduce((sum, c) =>
-    sum + getCourseProgress(c.slug, c.units.length).filter(Boolean).length, 0
-  )
-
-  return (
-    <main className="student-dashboard">
-      <section className="dashboard-welcome">
-        <div>
-          <span className="kicker">MONDAY · YOUR LEARNING STUDIO</span>
-          <h1>Namaste, Ananya.</h1>
-          <p>You are one lesson away from completing Precision Measurement. Keep the thread moving.</p>
-        </div>
-        <div className="dashboard-welcome-actions">
-          <button className="resume-button" onClick={() => navigate("module/precision-measurement")}>Resume lesson <Icon name="arrow" /></button>
-          <button className="outline-button" style={{ padding: "12px 17px", fontSize: "11px" }} onClick={() => navigate("profile")}>View profile <Icon name="arrow" size={16} /></button>
-        </div>
-      </section>
-
-      <section className="dashboard-stats">
-        <div className="overall-card">
-          <ProgressRing value={overallPct} label="COURSE COMPLETE" />
-          <div><span>OVERALL JOURNEY</span><h2>Building precision,<br />one line at a time.</h2><p>{completedUnits} of {totalUnits} units complete across all 6 courses</p></div>
-        </div>
-        <div className="stat-card"><span>QUIZZES PASSED</span><strong>08<small>/12</small></strong><div className="stat-bar"><i style={{ width: "67%" }} /></div><p>Next: Textile behaviour</p></div>
-        <div className="stat-card"><span>DRAFTS FINISHED</span><strong>07<small>/18</small></strong><div className="stat-bar amber"><i style={{ width: "39%" }} /></div><p>3 awaiting review</p></div>
-      </section>
-
-      <section className="roadmap-section" id="module-roadmap">
-        <div className="roadmap-heading">
-          <div><span className="kicker">IMMERSIVE LEARNING PATH</span><h2>Your module roadmap</h2></div>
-          <p>Build from material intelligence to advanced drape architecture. Every milestone combines theory, calculation and hands-on drafting.</p>
-        </div>
-        <div className="roadmap-list">
-          {learningLevels.map((level, index) => (
-            <React.Fragment key={level.no}>
-              <article className={openLevel === index ? "roadmap-card open" : "roadmap-card"}>
-                <button className="roadmap-summary" onClick={() => setLevel(openLevel === index ? -1 : index)}>
-                  <span className="roadmap-no">{level.progress === 100 ? <Icon name="check" /> : level.no}</span>
-                  <span className="roadmap-title"><small>LEVEL {level.no}</small><strong>{level.title}</strong><i>{level.subtitle}</i></span>
-                  <span className="roadmap-progress"><span>{level.progress}%</span><i><b style={{ width: `${level.progress}%` }} /></i></span>
-                  <span className="roadmap-toggle">{openLevel === index ? "−" : "+"}</span>
-                </button>
-                {openLevel === index && (
-                  <div className="roadmap-content">
-                    <ol>{level.lessons.map((lesson, lessonIndex) => <li key={lesson}><span>{lessonIndex + 1}</span>{lesson}{lessonIndex < Math.floor(level.progress / 25) && <Icon name="check" size={15} />}</li>)}</ol>
-                    <button onClick={() => navigate(`module/${index === 0 ? "foundation-textile-science" : index === 1 ? "precision-measurement" : index === 2 ? "blouse-drafting" : "advanced-drapery"}`)}>
-                      {level.progress ? "Continue module" : "Preview module"} <Icon name="arrow" size={17} />
-                    </button>
-                  </div>
-                )}
-              </article>
-
-              {/* Milestone Continuous Tests placed between modules */}
-              {index === 0 && (
-                <div className="my-3 p-4 rounded-xl bg-[#faf6ee] border border-[#e5dccf] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#aa7917] tracking-wider block">Continuous Progress Test 01</span>
-                    <strong className="text-sm font-serif text-[#172b2b]">Skin Tone Harmony Checkpoint</strong>
-                    <p className="text-[11px] text-[#666]">Assess WCAG contrast ratios across 3 skin tones before unlocking Level 02.</p>
-                  </div>
-                  <button onClick={() => navigate("test/mode2_skin_tone")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">
-                    Start Checkpoint →
-                  </button>
-                </div>
-              )}
-
-              {index === 1 && (
-                <div className="my-3 p-4 rounded-xl bg-[#f5eff9] border border-[#dfcee9] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#754058] tracking-wider block">Continuous Progress Test 02</span>
-                    <strong className="text-sm font-serif text-[#172b2b]">Dieline Reverse Engineering Exam</strong>
-                    <p className="text-[11px] text-[#666]">Verify mathematical drafting precision of armhole and dart lines vs AI reference.</p>
-                  </div>
-                  <button onClick={() => navigate("test/mode3_dieline_reverse")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">
-                    Start Checkpoint →
-                  </button>
-                </div>
-              )}
-
-              {index === 2 && (
-                <div className="my-3 p-4 rounded-xl bg-[#edf5f0] border border-[#c4dcce] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#28453c] tracking-wider block">Continuous Progress Test 03</span>
-                    <strong className="text-sm font-serif text-[#172b2b]">Indo-Western Blend &amp; Fusion Challenge</strong>
-                    <p className="text-[11px] text-[#666]">Fuse Kanjeevaram silk weave with structured Parisian tailored architecture.</p>
-                  </div>
-                  <button onClick={() => navigate("test/mode4_blend_fusion")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">
-                    Start Checkpoint →
-                  </button>
-                </div>
-              )}
-
-              {index === 3 && (
-                <>
-                  <div className="my-3 p-4 rounded-xl bg-[#fef7ee] border border-[#fae2c5] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-[#c9513e] tracking-wider block">Continuous Progress Test 04</span>
-                      <strong className="text-sm font-serif text-[#172b2b]">Speed Recognition Sprint</strong>
-                      <p className="text-[11px] text-[#666]">10 rapid-fire visual garment identification questions with 60-second timer.</p>
-                    </div>
-                    <button onClick={() => navigate("test/mode5_speed_round")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">
-                      Start Checkpoint →
-                    </button>
-                  </div>
-                  <div className="my-3 p-4 rounded-xl bg-[#172b2b] text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-                    <div>
-                      <span className="text-[10px] uppercase font-bold text-[#e8b547] tracking-wider block">Final Capstone Test 05</span>
-                      <strong className="text-base font-serif text-white">Comprehensive Jury Case Study</strong>
-                      <p className="text-[11px] text-[#cad5cf]">Complete client portfolio evaluated across sketch, 3D fit, and dieline accuracy.</p>
-                    </div>
-                    <button onClick={() => navigate("test/mode6_case_study")} className="px-4 py-2 bg-[#e8b547] text-[#172b2b] text-xs font-bold rounded-lg hover:bg-[#d8a436] transition-all">
-                      Begin Capstone Jury →
-                    </button>
-                  </div>
-                </>
-              )}
-            </React.Fragment>
-          ))}
-        </div>
-      </section>
-
-      <section className="achievements">
-        <div className="achievement-heading"><span className="kicker light">MILESTONE BADGES</span><h2>Your craft cabinet</h2><p>Tokens mark the techniques you can confidently carry into your own practice.</p></div>
-        <div className="badge-row">
-          <div className="badge-card unlocked"><span><Icon name="ruler" size={28} /></span><strong>Master Draftsman</strong><small>Measurement quiz · 90%</small></div>
-          <div className="badge-card unlocked gold"><span><Icon name="swatch" size={28} /></span><strong>Color Harmony Pro</strong><small>3 palettes completed</small></div>
-          <div className="badge-card"><span><Icon name="thread" size={28} /></span><strong>Blouse Expert</strong><small>Complete Level 03 to unlock</small></div>
-          <div className="badge-card"><span><Icon name="spark" size={28} /></span><strong>Drape Architect</strong><small>Complete Level 04 to unlock</small></div>
-        </div>
-      </section>
-    </main>
   )
 }
 
@@ -1086,7 +936,8 @@ function UnitLesson({ courseSlug, unitIndex, navigate }: { courseSlug: string; u
   )
 }
 
-function App() {
+// ─── Auth-aware inner App (needs AuthProvider wrapper above) ─────────────────
+function AppInner() {
   const [activeModule, setActiveModule] = useState(0)
   const [palette, setPalette] = useState(0)
   const [saved, setSaved] = useState(false)
@@ -1101,6 +952,12 @@ function App() {
   const moduleProgress = useMemo(() => [72, 34, 12, 0][activeModule], [activeModule])
   const reveal = useScrollReveal()
 
+  // ── Auth state ──────────────────────────────────────────────────────────────
+  const { user, profile, signOut, updatePlacementResult, loading: authLoading } = useAuth()
+  const [loginOpen, setLoginOpen] = useState(false)
+  const [loginIntent, setLoginIntent] = useState<"start" | "generic">("generic")
+  const [pendingPlacementVariant, setPendingPlacementVariant] = useState(0)
+  const [showPlacementTest, setShowPlacementTest] = useState(false)
 
   const showNotice = (message: string) => {
     setNotice(message)
@@ -1141,22 +998,73 @@ function App() {
     window.setTimeout(() => document.querySelector(`#${section}`)?.scrollIntoView({ behavior: "smooth" }), 0)
   }
 
+  // ── Placement test launch ───────────────────────────────────────────────────
+  // Picks a random variant (0–5) and gates behind login
   const handleBeginJourney = () => {
-    const placementModes = [
-      "mode1_prompt_to_dress",
-      "mode2_skin_tone",
-      "mode3_dieline_reverse",
-      "mode4_blend_fusion",
-      "mode5_speed_round",
-      "mode6_case_study"
-    ]
-    const randomMode = placementModes[Math.floor(Math.random() * placementModes.length)]
-    navigate(`placement/${randomMode}`)
+    const variant = Math.floor(Math.random() * 6)
+    setPendingPlacementVariant(variant)
+    if (!user) {
+      // Not logged in: show login first, then launch test on success
+      setLoginIntent("start")
+      setLoginOpen(true)
+    } else {
+      // Already logged in
+      setShowPlacementTest(true)
+    }
   }
+
+  const handleLoginSuccess = () => {
+    setLoginOpen(false)
+    // If user was trying to start placement test, launch it now
+    setShowPlacementTest(true)
+  }
+
+  const handlePlacementComplete = async (score: number, level: string) => {
+    const path = getDefaultPath(level as "foundation" | "intermediate" | "advanced")
+    await updatePlacementResult(score, level, path)
+    showNotice(`Learning path generated! Level: ${level} (${score}%)`)
+    setShowPlacementTest(false)
+    navigate("progress")
+  }
+
+  // ── Header: auth-aware profile widget ──────────────────────────────────────
+  const initials = profile?.avatarInitials ?? (user?.email?.[0]?.toUpperCase() ?? "?")
+  const displayName = profile?.displayName ?? user?.email?.split("@")[0] ?? ""
+  const progressPct = profile?.placementDone
+    ? Math.round((profile.completedModules.length / Math.max(profile.learningPath.length, 1)) * 100)
+    : 0
 
   return (
     <div className="app-shell">
       {notice && <div className="toast"><Icon name="check" size={16} />{notice}</div>}
+
+      {/* Login modal */}
+      <LoginModal
+        isOpen={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onSuccess={handleLoginSuccess}
+        intent={loginIntent}
+      />
+
+      {/* Inline placement test overlay */}
+      {showPlacementTest && (
+        <div className="fixed inset-0 z-[990] bg-[#faf8f4] overflow-y-auto p-6 lg:p-12">
+          <div className="max-w-3xl mx-auto">
+            <div className="mb-4 bg-white p-4 rounded-xl border border-[#ded4c3] flex justify-between items-center">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-[#c9513e]">Diagnostic Placement Assessment</span>
+                <h2 className="text-xl font-serif text-[#172b2b]">Starting Assessment for Personalised Roadmap</h2>
+              </div>
+              <button onClick={() => setShowPlacementTest(false)} className="text-xs font-bold text-[#888] hover:text-[#172b2b]">Exit</button>
+            </div>
+            <PlacementTest
+              testVariant={pendingPlacementVariant}
+              onComplete={handlePlacementComplete}
+              onCancel={() => setShowPlacementTest(false)}
+            />
+          </div>
+        </div>
+      )}
 
       <header className="site-header">
         <a className="brand" href="#top" aria-label="VastraKala Labs home" onClick={(event) => { event.preventDefault(); goHome() }}>
@@ -1169,10 +1077,35 @@ function App() {
           <a className={route === "resources" ? "active" : ""} href="#resources" onClick={(event) => { event.preventDefault(); navigate("resources") }}>Resources</a>
         </nav>
         <div className="header-actions">
-          <button className="profile-widget" onClick={() => navigate("profile")} aria-label="Open student profile">
-            <span className="streak">7<small>day</small></span>
-            <span className="profile-avatar">AS<i>42%</i></span>
-          </button>
+          {authLoading ? null : user ? (
+            // Logged-in: show real initials + progress + sign-out option
+            <div className="flex items-center gap-2">
+              <button
+                className="profile-widget"
+                onClick={() => navigate("profile")}
+                aria-label="Open student profile"
+                title={displayName}
+              >
+                <span className="streak">{profile?.streakDays ?? 0}<small>day</small></span>
+                <span className="profile-avatar">{initials}<i>{progressPct}%</i></span>
+              </button>
+              <button
+                onClick={async () => { await signOut(); showNotice("Signed out successfully.") }}
+                className="text-[11px] font-bold text-[#888] hover:text-[#c9513e] px-2 py-1 rounded-lg hover:bg-[#fdf2ee] transition-all"
+                title="Sign out"
+              >
+                Sign out
+              </button>
+            </div>
+          ) : (
+            // Not logged in: Sign In button
+            <button
+              onClick={() => { setLoginIntent("generic"); setLoginOpen(true) }}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-xl hover:bg-[#c9513e] transition-all"
+            >
+              Sign In
+            </button>
+          )}
           <button className="menu-button" aria-label="Toggle menu" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Icon name="menu" /></button>
         </div>
       </header>
@@ -1185,14 +1118,8 @@ function App() {
           navigate={navigate}
         />
       ) : route.startsWith("placement/") ? (
+        // Legacy placement route — redirect to inline placement test
         <main className="p-6 lg:p-12 max-w-7xl mx-auto">
-          <div className="mb-4 bg-[#faf7f0] p-4 rounded-xl border border-[#ded4c3] flex justify-between items-center">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[#c9513e]">Diagnostic Placement Assessment</span>
-              <h2 className="text-xl font-serif text-[#172b2b]">Starting Assessment for Personalized Roadmap</h2>
-            </div>
-            <button onClick={() => goHome()} className="text-xs font-bold text-[#888] hover:text-[#172b2b]">Exit to Home</button>
-          </div>
           <TestModeRunner
             modeId={route.replace("placement/", "")}
             isTestMode={true}
@@ -1242,7 +1169,7 @@ function App() {
           <div className="hero-copy">
             <div className="eyebrow"><span>शिल्प से शैली तक</span><i /> From craft to couture</div>
             <h1>Learn the language<br />of <em>Indian fashion.</em></h1>
-            <p>Master design fundamentals, pattern mathematics, colour theory and India's living textile traditions—one thoughtful lesson at a time.</p>
+            <p>Master design fundamentals, pattern mathematics, colour theory and India&apos;s living textile traditions—one thoughtful lesson at a time.</p>
             <div className="hero-actions">
               <button className="primary-button" onClick={handleBeginJourney}>
                 Begin your journey <Icon name="arrow" />
@@ -1393,7 +1320,7 @@ function App() {
             <span className="kicker">TEXTILE STORIES · ODISHA</span>
             <h2>Every thread<br />holds a <em>history.</em></h2>
             <p>Go beyond technique to meet the communities, regions and ideas that give Indian textiles their soul.</p>
-            <blockquote>“Bandha is not merely a pattern. It is mathematics, memory and patience tied into every thread.”</blockquote>
+            <blockquote>&ldquo;Bandha is not merely a pattern. It is mathematics, memory and patience tied into every thread.&rdquo;</blockquote>
             <a className="outline-button inline-flex items-center gap-2" href="https://craftscouncilofindia.org/" target="_blank" rel="noreferrer">
               Explore Odisha Bandha <Icon name="arrow" size={18} />
             </a>
@@ -1407,13 +1334,206 @@ function App() {
           <a className="brand light-brand" href="#top">
             <BrandLogo variant="footer" />
           </a>
-          <p>A digital school for India's fashion design language.</p>
+          <p>A digital school for India&apos;s fashion design language.</p>
         </div>
         <div className="footer-note"><span>VASTRAKALA LABS 2025</span><p>Fashion Design Learning Platform<br />India</p></div>
         <div className="footer-links"><a href="#ai-studio">AI Studio</a><a href="#progress">Progress</a><a href="#history">History</a><a href="#resources">Resources</a></div>
         <p className="copyright">© 2025 VastraKala Labs. Crafted with care in India.</p>
       </footer>
     </div>
+  )
+}
+
+// ─── StudentDashboard: shows auth-aware progress + wavy learning path ─────────
+function StudentDashboard({ navigate }: { navigate: (path: string) => void }) {
+  const { profile, user } = useAuth()
+  const [openLevel, setOpenLevel] = useState(0)
+  const [activeTab, setActiveTab] = useState<"path" | "roadmap">("path")
+
+  // Static roadmap shown to guests / before placement test
+  const learningLevels = [
+    { no: "01", title: "Foundation & Textile Science", subtitle: "Know the material before shaping the form", progress: 0, lessons: ["Fabric grain lines", "Shrinkage mathematics", "Silk, cotton & georgette", "Traditional weave structures"] },
+    { no: "02", title: "Precision Body Measurement & Math", subtitle: "Translate the body into accurate numbers", progress: 0, lessons: ["Bust and waist ratios", "Armhole depth formulas", "Salwar flare calculations", "Chudidar ease"] },
+    { no: "03", title: "Blouse & Upper Garment Drafting", subtitle: "Build fitted blocks with confidence", progress: 0, lessons: ["Katori blouse block", "Princess-cut manipulation", "Boat-neck chudidar top", "Fit correction"] },
+    { no: "04", title: "Advanced Saree Drapery & Fusion Silhouettes", subtitle: "Engineer movement from unstitched cloth", progress: 0, lessons: ["Pre-stitched pleat architecture", "Drape anchoring", "Motif placement grids", "Fusion silhouette lab"] },
+  ]
+
+  const hasPlaPath = profile?.placementDone && (profile?.learningPath?.length ?? 0) > 0
+  const completedModules = profile?.completedModules ?? []
+  const totalNodes = profile?.learningPath?.length ?? 0
+  const pct = totalNodes > 0 ? Math.round((completedModules.length / totalNodes) * 100) : 0
+
+  return (
+    <main className="student-dashboard">
+      <section className="dashboard-welcome">
+        <div>
+          <span className="kicker">YOUR LEARNING STUDIO</span>
+          <h1>
+            {user
+              ? `Namaste, ${profile?.displayName?.split(" ")[0] ?? "Designer"}.`
+              : "Welcome to VastraShastra."}
+          </h1>
+          <p>
+            {hasPlaPath
+              ? `You are on the ${profile?.placementLevel} path. ${totalNodes - completedModules.length} milestones remaining.`
+              : user
+              ? "Complete your placement test on the homepage to generate a personalised learning path."
+              : "Sign in and complete your placement test to unlock your personalised learning path."}
+          </p>
+        </div>
+        <button className="resume-button" onClick={() => navigate("module/precision-measurement")}>
+          Resume lesson <Icon name="arrow" />
+        </button>
+      </section>
+
+      <section className="dashboard-stats">
+        <div className="overall-card">
+          <ProgressRing value={hasPlaPath ? pct : 0} label="PATH COMPLETE" />
+          <div>
+            <span>OVERALL JOURNEY</span>
+            <h2>{hasPlaPath ? `${profile?.placementLevel?.toUpperCase()} path` : "Start your placement test"}</h2>
+            <p>{hasPlaPath ? `${completedModules.length} of ${totalNodes} milestones complete` : "Take the placement test to get a personalised path"}</p>
+          </div>
+        </div>
+        <div className="stat-card">
+          <span>QUIZZES PASSED</span>
+          <strong>{profile?.quizHistory?.filter(q => q.score >= 60).length ?? 0}<small>/{profile?.quizHistory?.length ?? 0}</small></strong>
+          <div className="stat-bar"><i style={{ width: `${profile?.quizHistory?.length ? Math.round((profile.quizHistory.filter(q => q.score >= 60).length / profile.quizHistory.length) * 100) : 0}%` }} /></div>
+          <p>Next: Textile behaviour</p>
+        </div>
+        <div className="stat-card">
+          <span>MILESTONES DONE</span>
+          <strong>{completedModules.length}<small>/{totalNodes}</small></strong>
+          <div className="stat-bar amber"><i style={{ width: `${pct}%` }} /></div>
+          <p>{totalNodes - completedModules.length} remaining</p>
+        </div>
+      </section>
+
+      {/* Personalised learning path vs static roadmap tabs */}
+      <section className="roadmap-section" id="module-roadmap">
+        <div className="roadmap-heading">
+          <div>
+            <span className="kicker">IMMERSIVE LEARNING PATH</span>
+            <h2>{hasPlaPath ? "Your personalised path" : "Your module roadmap"}</h2>
+          </div>
+          {hasPlaPath && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setActiveTab("path")}
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${activeTab === "path" ? "bg-[#172b2b] text-white" : "bg-[#f5f0e8] text-[#666]"}`}
+              >
+                Tailored Path
+              </button>
+              <button
+                onClick={() => setActiveTab("roadmap")}
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${activeTab === "roadmap" ? "bg-[#172b2b] text-white" : "bg-[#f5f0e8] text-[#666]"}`}
+              >
+                Module Roadmap
+              </button>
+            </div>
+          )}
+        </div>
+
+        {hasPlaPath && activeTab === "path" ? (
+          <LearningPathView
+            onNavigateToModule={(slug) => navigate(`lesson/${slug}/0`)}
+            onNavigateToTest={(modeId) => navigate(`test/${modeId}`)}
+          />
+        ) : (
+          <div className="roadmap-list">
+            {learningLevels.map((level, index) => (
+              <React.Fragment key={level.no}>
+                <article className={openLevel === index ? "roadmap-card open" : "roadmap-card"}>
+                  <button className="roadmap-summary" onClick={() => setOpenLevel(openLevel === index ? -1 : index)}>
+                    <span className="roadmap-no">{level.progress === 100 ? <Icon name="check" /> : level.no}</span>
+                    <span className="roadmap-title"><small>LEVEL {level.no}</small><strong>{level.title}</strong><i>{level.subtitle}</i></span>
+                    <span className="roadmap-progress"><span>{level.progress}%</span><i><b style={{ width: `${level.progress}%` }} /></i></span>
+                    <span className="roadmap-toggle">{openLevel === index ? "−" : "+"}</span>
+                  </button>
+                  {openLevel === index && (
+                    <div className="roadmap-content">
+                      <ol>{level.lessons.map((lesson, lessonIndex) => <li key={lesson}><span>{lessonIndex + 1}</span>{lesson}</li>)}</ol>
+                      <button onClick={() => navigate(`module/${index === 0 ? "foundation-textile-science" : index === 1 ? "precision-measurement" : index === 2 ? "blouse-drafting" : "advanced-drapery"}`)}>
+                        {level.progress ? "Continue module" : "Preview module"} <Icon name="arrow" size={17} />
+                      </button>
+                    </div>
+                  )}
+                </article>
+
+                {index === 0 && (
+                  <div className="my-3 p-4 rounded-xl bg-[#faf6ee] border border-[#e5dccf] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#aa7917] tracking-wider block">Continuous Progress Test 01</span>
+                      <strong className="text-sm font-serif text-[#172b2b]">Skin Tone Harmony Checkpoint</strong>
+                      <p className="text-[11px] text-[#666]">Assess WCAG contrast ratios across 3 skin tones before unlocking Level 02.</p>
+                    </div>
+                    <button onClick={() => navigate("test/mode2_skin_tone")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">Start Checkpoint →</button>
+                  </div>
+                )}
+                {index === 1 && (
+                  <div className="my-3 p-4 rounded-xl bg-[#f5eff9] border border-[#dfcee9] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#754058] tracking-wider block">Continuous Progress Test 02</span>
+                      <strong className="text-sm font-serif text-[#172b2b]">Dieline Reverse Engineering Exam</strong>
+                      <p className="text-[11px] text-[#666]">Verify mathematical drafting precision of armhole and dart lines vs AI reference.</p>
+                    </div>
+                    <button onClick={() => navigate("test/mode3_dieline_reverse")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">Start Checkpoint →</button>
+                  </div>
+                )}
+                {index === 2 && (
+                  <div className="my-3 p-4 rounded-xl bg-[#edf5f0] border border-[#c4dcce] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#28453c] tracking-wider block">Continuous Progress Test 03</span>
+                      <strong className="text-sm font-serif text-[#172b2b]">Indo-Western Blend &amp; Fusion Challenge</strong>
+                      <p className="text-[11px] text-[#666]">Fuse Kanjeevaram silk weave with structured Parisian tailored architecture.</p>
+                    </div>
+                    <button onClick={() => navigate("test/mode4_blend_fusion")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">Start Checkpoint →</button>
+                  </div>
+                )}
+                {index === 3 && (
+                  <>
+                    <div className="my-3 p-4 rounded-xl bg-[#fef7ee] border border-[#fae2c5] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#c9513e] tracking-wider block">Continuous Progress Test 04</span>
+                        <strong className="text-sm font-serif text-[#172b2b]">Speed Recognition Sprint</strong>
+                        <p className="text-[11px] text-[#666]">10 rapid-fire visual garment identification questions with 60-second timer.</p>
+                      </div>
+                      <button onClick={() => navigate("test/mode5_speed_round")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">Start Checkpoint →</button>
+                    </div>
+                    <div className="my-3 p-4 rounded-xl bg-[#172b2b] text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#e8b547] tracking-wider block">Final Capstone Test 05</span>
+                        <strong className="text-base font-serif text-white">Comprehensive Jury Case Study</strong>
+                        <p className="text-[11px] text-[#cad5cf]">Complete client portfolio evaluated across sketch, 3D fit, and dieline accuracy.</p>
+                      </div>
+                      <button onClick={() => navigate("test/mode6_case_study")} className="px-4 py-2 bg-[#e8b547] text-[#172b2b] text-xs font-bold rounded-lg hover:bg-[#d8a436] transition-all">Begin Capstone Jury →</button>
+                    </div>
+                  </>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="achievements">
+        <div className="achievement-heading"><span className="kicker light">MILESTONE BADGES</span><h2>Your craft cabinet</h2><p>Tokens mark the techniques you can confidently carry into your own practice.</p></div>
+        <div className="badge-row">
+          <div className={`badge-card ${completedModules.length >= 2 ? "unlocked" : ""}`}><span><Icon name="ruler" size={28} /></span><strong>Master Draftsman</strong><small>{completedModules.length >= 2 ? "Earned!" : "Complete 2 modules to unlock"}</small></div>
+          <div className={`badge-card ${(profile?.quizHistory?.length ?? 0) >= 3 ? "unlocked gold" : ""}`}><span><Icon name="swatch" size={28} /></span><strong>Color Harmony Pro</strong><small>{(profile?.quizHistory?.length ?? 0) >= 3 ? "Earned!" : "Complete 3 quizzes to unlock"}</small></div>
+          <div className="badge-card"><span><Icon name="thread" size={28} /></span><strong>Blouse Expert</strong><small>Complete the blouse module to unlock</small></div>
+          <div className="badge-card"><span><Icon name="spark" size={28} /></span><strong>Drape Architect</strong><small>Complete Level 04 to unlock</small></div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   )
 }
 
