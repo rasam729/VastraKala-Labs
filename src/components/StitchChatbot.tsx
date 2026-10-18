@@ -15,43 +15,78 @@ interface ChatMessage {
 
 const GEMINI_API_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || ""
 
-const SYSTEM_PROMPT = `You are "Stitch", the resident feline Master Atelier AI Mentor at VastraKala Labs (The Science & Soul of Indian Couture).
-You possess decades of deep wisdom across Indian fashion design, traditional textiles, pattern drafting mathematics, colour harmony, and this entire learning platform.
+// Verified active models on this Gemini endpoint
+const GEMINI_MODELS = [
+  "gemini-flash-latest",
+  "gemini-3.5-flash",
+  "gemini-3.8-flash",
+  "gemini-3-flash-preview"
+]
 
-Your expertise includes:
-1. Indian Fashion Heritage: Vedic draping, Mughal courtly attire (Jama, Angrakha, Aba), regional sarees (Nivi, Nauvari, Seedha Pallu, Mekhela Chador), and contemporary Indo-Western revival.
-2. Traditional Indian Textiles: Banarasi brocade, Kanjeevaram Korvai interlocking weave, Chanderi tissue, Patola double ikat, Sambalpuri Bandha, Ajrakh natural resist printing, Jamdani extra-weft, Paithani tapestry borders.
-3. Surface Ornamentation: Zardozi metallic relief, Lucknowi Chikankari shadow work, Punjabi Phulkari geometric silk floss, Rajasthani Gota Patti applique, Bengali Kantha running stitch.
-4. Exact Pattern Mathematics & Drafting Formulas:
-   - Armhole Depth = Bust ÷ 6 + 7 cm
-   - Single Waist Dart Intake = (Bust − Waist) ÷ 8
-   - Quarter Bust with Ease = Bust ÷ 4 + 2.5 cm
-   - Salwar Crotch Depth = Hip ÷ 4 + 2 cm
-   - Sleeve Cap Height = 2/3 of Armhole Depth
-   - Back Neck Width = Shoulder ÷ 6 + 0.5 cm
-   - Standard seam allowances: 1.5 cm for structural seams; 0.5 cm for stay-stitched curves.
-5. Skin Tone Contrast & Colour Science:
-   - Warm Undertones (Wheatish / Golden / Warm Honey): Flattered by rich jewel tones (Madder Ruby, Emerald, Indigo, Amber Gold) with WCAG contrast ratio > 3.5:1.
-   - Cool Undertones (Pinkish / Olive / Deep Ebony): Flattered by royal sapphire, cool fuchsia, jade, silver zari.
-   - Dual-tone borders and neutral ivory bridges for high-contrast balance.
-6. VastraKala Labs Platform Features:
-   - AI Studio: Sketch & Design Studio (canvas with undo/clear, sketch image upload to Gemini dress synthesis, PNG download), Colour Theory & Skin Lab, Technical Dieline (CAD vector generator with measurement blanks), and 3D Model Testing (Three.js SMPL body, continuous skin spectrum scrollbar, and Trellis 3D mesh synthesis).
-   - Placement Test: 6 diagnostic test variants generating the wavy tailoring-stitch learning path in the Progress tab.
-   - Curriculum: 6 courses, 30 units with embedded YouTube studio tutorials and curated research documentation.
+const SYSTEM_PROMPT = `You are "Stitch", the resident feline Master Atelier AI Mentor at VastraKala Labs (VastraShastra: The Science & Soul of Indian Couture).
+You possess profound, encyclopedic knowledge across Indian haute couture, traditional textiles, mathematical pattern drafting, colour contrast science, and every feature of the VastraKala Labs application.
 
-Personality & Tone:
-Warm, articulate, witty, encouraging, and rigorous with craft measurements. You are a mentor guiding an apprentice tailor or fashion designer. Format your answers clearly with bullet points, bold highlights, and mathematical formulas when appropriate.`
+### Your Areas of Deep Expertise:
+
+1. Exact Pattern Mathematics & Drafting Formulas:
+   - Armhole Depth (Scye Drop):
+     * Standard Kurta / Kameez: Upper Chest ÷ 6 + 2.5 cm (1 inch)
+     * Body-Molded Blouse: Upper Chest ÷ 6 + 1.25 cm (0.5 inch) or Zarapkar formula: Chest ÷ 8 + 6.35 cm
+     * Deep Back Neck adjustment: When back neck is deeper than 7 inches, subtract 0.5 to 0.75 inches from armhole depth to prevent gaping.
+   - Single Waist Dart Intake: (Full Bust − Natural Waist) ÷ 8 (distribute evenly between front & back darts).
+   - Quarter Bust with Wearing Ease: Full Bust ÷ 4 + 2.5 cm (add 3.5 cm for non-stretch brocades/silks).
+   - Salwar & Churidar Crotch Depth: Hip ÷ 4 + 5 cm (with 1.5 cm crotch curve ease).
+   - Sleeve Cap Height: 2/3 of Armhole Depth.
+   - Lehenga Kalis (Panel) Math:
+     * Panel Waist Width = (Waist + 2 cm ease) ÷ Number of Kalis (e.g. 12, 16, or 24 kalis).
+     * Panel Hem Width = Desired Total Flare Circumference (e.g. 4.5 meters) ÷ Number of Kalis.
+   - Standard seam allowances: 1.5 cm on side seams; 0.5 cm on stay-stitched necklines and armhole curves.
+
+2. Living Indian Textile Science & Weaves:
+   - Banarasi: Kadhwa hand-weaving (individual motifs woven without floats on reverse) vs Fekwa; Zari pure silver gold electroplating.
+   - Kanjeevaram: Korvai technique (separate shuttles for body and border, hand-interlocked at boundary so zero thread mixes); Petni pallu joining.
+   - Chanderi: Degummed silk warp with fine unbleached cotton weft (counts 100s to 300s); delicate sheer gossamer texture.
+   - Ikat & Bandha: Sambalpuri Bandha (single/double ikat where warp/weft are tie-dyed before weaving); feathery blurred precision margins.
+   - Ajrakh: 14-stage block printing using indigo, madder, harda mordanting, and river washing in Dhamadka/Kutch.
+   - Patola: Double Ikat silk from Patan, Gujarat, aligned so precisely that both sides are identical.
+
+3. Surface Ornamentation & Embroideries:
+   - Zardozi: Heavy metallic relief using salma, sitara, dabka, and kora coiled wires couched on velvet or heavy silk.
+   - Lucknowi Chikankari: 32 traditional stitches, notably Bakhiya (shadow work on reverse of fine muslin/organza), Tepchi, Phanda, and Murri.
+   - Punjabi Phulkari: Untwisted pure floss silk (Pat) embroidered from reverse using darn stitch on coarse hand-spun khaddar.
+   - Rajasthani Gota Patti: Pure gold/silver ribbons cut into leaf/petal shapes and appliquéd with cord couching.
+   - Bengali Kantha: Layered vintage sari repurposing using running stitches to create rippled quilting.
+
+4. Couture Colour Theory & Skin Undertone Science:
+   - Indian Skin Tones (Porcelain, Golden Wheatish, Warm Honey, Bronze, Olive, Deep Espresso, Ebony).
+   - WCAG Contrast Ratios (Minimum Contrast Ratio 3.5:1, ideal 4.5:1 for regal presence).
+   - Warm Undertones: Radiate in saturated jewel tones (Madder Ruby, Peacock Teal, Antique Zari, Turmeric Ochre).
+   - Cool Undertones: Harmonize with Royal Sapphire, Cool Magenta, Emerald, Icy Silver, and Charcoal.
+   - Contrast Bridges: Using ivory, champagne, or raw silk piping to frame deep skin tones with high-saturation fabrics.
+
+5. VastraKala Labs Application Features:
+   - AI Studio (4 Quadrants):
+     1. Sketch & Design Studio: Draw on grid, undo/clear, upload sketch image, prompt synthesis with Gemini Vision, custom sleeve/collar/fabric nuances, high-res PNG download.
+     2. Colour Theory & Skin Lab: 2D mannequin contrast testing against 8 canonical skin tones with WCAG ratio scores.
+     3. Technical Dieline Studio: CAD vector generator classifying garment types (pants, kurti, anarkali, blouse, lehenga, sherwani) with exact measurement blanks.
+     4. 3D Garment Model Testing: Three.js white studio environment, SMPL anatomical body, continuous 0–100% skin-tone spectrum scrollbar (Porcelain to Dark Ebony), Trellis image-to-3D mesh generation via HuggingFace Gradio Space & Cloudinary upload, X/Y/Z transforms.
+   - Diagnostic Placement Assessment: 6 test variants assessing 6 craft domains to calculate accurate student level (Foundation, Intermediate, Advanced) and synthesize the wavy tailoring-stitch learning path in the Progress tab.
+   - Tailoring-Stitch Learning Path: Wavy SVG game-level track styled like a dashed tailor's chalk stitch line, complete with needle & thread markers, embedded YouTube studio tutorials, and verified research links.
+   - 6 Core Courses: 30 studio units covering Costumes, Textiles, Ornamentation, Pattern Making, Saree Draping, and Sustainability.
+
+Personality & Demeanour:
+You are witty, deeply affectionate of Indian crafts, meticulous with measurements, encouraging, and articulate like an experienced master couturier (*Ustad*). Format all your answers thoroughly with clear headings, bullet points, and exact formulas. Always explain *why* a formula or fabric works the way it does!`
 
 // Contextual quick suggestions based on current user view
 const ROUTE_SUGGESTIONS: Record<string, string[]> = {
   "ai-studio": [
     "How does the 3D Trellis mesh generator work?",
-    "What is the formula for armhole depth?",
-    "How do I annotate a technical dieline?",
+    "What is the exact formula for armhole depth?",
+    "How do I annotate a technical dieline for pants?",
     "Explain skin contrast ratio for Indian dresses"
   ],
   "progress": [
-    "How does my wavy learning path get generated?",
+    "How was my wavy learning path generated?",
     "What is the difference between Foundation and Advanced tier?",
     "How do I unlock milestone test checkpoints?",
     "Give me tips for the Katori blouse module"
@@ -68,9 +103,9 @@ const ROUTE_SUGGESTIONS: Record<string, string[]> = {
   ],
   "default": [
     "What is VastraKala Labs?",
-    "How do I calculate armhole depth?",
+    "How do I calculate armhole depth for a kurta?",
     "Which colours suit warm wheatish skin tones?",
-    "How do I start my personalized learning journey?"
+    "Explain Banarasi Kadhwa vs Jacquard weave"
   ]
 }
 
@@ -80,7 +115,7 @@ export default function StitchChatbot({ currentRoute = "" }: StitchChatbotProps)
     {
       id: "welcome",
       sender: "stitch",
-      text: "Purr-fect timing! I'm Stitch, your resident AI Master Couturier. Whether you need pattern drafting formulas, textile history, skin contrast advice, or guidance in the 3D Fit Lab—just ask!",
+      text: "Purr-fect timing! I'm Stitch, your resident AI Master Couturier. Whether you need exact pattern drafting formulas, textile history, skin contrast advice, or guidance in the 3D Fit Lab—just ask!",
       timestamp: "Just now"
     }
   ])
@@ -99,7 +134,7 @@ export default function StitchChatbot({ currentRoute = "" }: StitchChatbotProps)
   // Contextual bubble tip when route changes
   useEffect(() => {
     if (currentRoute.includes("ai-studio")) {
-      setBubbleTip("In the AI Studio? I can help with dielines & 3D fit! 🎨")
+      setBubbleTip("In the AI Studio? Ask about 3D fit or dieline math! 🎨")
     } else if (currentRoute.includes("progress")) {
       setBubbleTip("Checking your learning path? Let's discuss milestones! 🧵")
     } else if (currentRoute.includes("placement")) {
@@ -134,98 +169,168 @@ export default function StitchChatbot({ currentRoute = "" }: StitchChatbotProps)
     if (!userPrompt) setInputValue("")
     setIsLoading(true)
 
-    // Call Gemini API
     try {
       let stitchReply = ""
 
+      // ── Method 1: Direct Gemini REST call with active models ──
       if (GEMINI_API_KEY && GEMINI_API_KEY.length > 10) {
-        try {
-          const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
-          // Try gemini-1.5-flash first, fallback to 2.0-flash or 1.5-pro
-          const modelNames = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
-          let responseText = ""
+        // Build recent conversational history
+        const recentHistory = messages.slice(-4).map((m) => ({
+          role: m.sender === "user" ? "user" : "model",
+          parts: [{ text: m.text }]
+        }))
 
-          for (const mName of modelNames) {
-            try {
-              const model = genAI.getGenerativeModel({
-                model: mName,
-                systemInstruction: SYSTEM_PROMPT
-              })
-              const result = await model.generateContent({
-                contents: [
-                  {
-                    role: "user",
-                    parts: [
-                      {
-                        text: `Context: The student is currently on page/route "${currentRoute || "home"}".
-Student asks: ${textToSend}`
-                      }
-                    ]
-                  }
-                ]
-              })
-              responseText = result.response.text()
-              if (responseText) break
-            } catch (err) {
-              console.warn(`Model ${mName} attempt failed:`, err)
+        const payload = {
+          contents: [
+            ...recentHistory,
+            {
+              role: "user",
+              parts: [
+                {
+                  text: `Current Studio/Page: "${currentRoute || "main"}"
+Student Question: ${textToSend}`
+                }
+              ]
             }
+          ],
+          systemInstruction: {
+            parts: [{ text: SYSTEM_PROMPT }]
+          },
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1200
           }
+        }
 
-          if (responseText) {
-            stitchReply = responseText
+        for (const mName of GEMINI_MODELS) {
+          try {
+            const resp = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${mName}:generateContent?key=${GEMINI_API_KEY}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+              }
+            )
+
+            if (resp.ok) {
+              const data = await resp.json()
+              const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+              if (text && text.trim().length > 0) {
+                stitchReply = text
+                break
+              }
+            } else {
+              console.warn(`Gemini REST model ${mName} returned status ${resp.status}`)
+            }
+          } catch (fetchErr) {
+            console.warn(`Gemini REST fetch for ${mName} failed:`, fetchErr)
           }
-        } catch (apiErr) {
-          console.warn("Direct GoogleGenerativeAI call failed, checking fallback:", apiErr)
+        }
+
+        // ── Method 2: SDK Fallback if REST was blocked by CORS/fetch ──
+        if (!stitchReply) {
+          try {
+            const genAI = new GoogleGenerativeAI(GEMINI_API_KEY)
+            for (const mName of GEMINI_MODELS) {
+              try {
+                const model = genAI.getGenerativeModel({
+                  model: mName,
+                  systemInstruction: SYSTEM_PROMPT
+                })
+                const result = await model.generateContent({
+                  contents: [
+                    {
+                      role: "user",
+                      parts: [
+                        {
+                          text: `Context: Student is on route "${currentRoute || "home"}".
+Question: ${textToSend}`
+                        }
+                      ]
+                    }
+                  ]
+                })
+                const text = result.response.text()
+                if (text && text.trim().length > 0) {
+                  stitchReply = text
+                  break
+                }
+              } catch (sdkErr) {
+                console.warn(`SDK model ${mName} failed:`, sdkErr)
+              }
+            }
+          } catch (sdkInitErr) {
+            console.warn("SDK initialization error:", sdkInitErr)
+          }
         }
       }
 
-      // High-quality deterministic fallback knowledge base if API key is not ready or rate-limited
+      // ── Method 3: Expert Deterministic Fallback if network/offline ──
       if (!stitchReply) {
         const lower = textToSend.toLowerCase()
-        if (lower.includes("armhole") || lower.includes("depth") || lower.includes("sleeve")) {
-          stitchReply = `**Armhole Depth Formula**:
-• **Standard Formula**: \`Armhole Depth = Bust ÷ 6 + 7 cm\`
-• *Example*: For an 88 cm bust: \`88 ÷ 6 + 7 = 14.66 + 7 = 21.66 cm\` (round to 21.5–22.0 cm).
-• **Sleeve Cap Height**: \`2/3 × Armhole Depth\` (e.g., \`2/3 × 21.6 = 14.4 cm\`).
-• **Atelier Pro-Tip**: Always add 1.5 cm wearing ease when drafting silk or heavy brocade, as structured handlooms have zero stretch!`
-        } else if (lower.includes("dart") || lower.includes("katori") || lower.includes("blouse")) {
-          stitchReply = `**Waist Dart & Bodice Intake Mathematics**:
-• **Single Waist Dart Intake**: \`(Bust − Waist) ÷ 8\`
-• *Example*: If Bust = 88 cm and Waist = 72 cm, difference = 16 cm. \`16 ÷ 8 = 2.0 cm\` dart allowance per side.
-• **Apex Distance**: Usually \`Bust ÷ 10 + 1 cm\` from centre front.
-• For a **Katori Blouse**, always shape the rounded bottom cup along the true bias grain (45°) for natural breast contouring without underwires!`
-        } else if (lower.includes("trellis") || lower.includes("3d") || lower.includes("model")) {
-          stitchReply = `**3D Garment Synthesis & Trellis Guide**:
-1. **Upload Reference**: In the 3D Model Testing tab, upload a clean garment photo.
-2. **Click "Generate 3D Model"**: Our backend uploads the image to Cloudinary and communicates directly with the HuggingFace TRELLIS Gradio space to synthesize a full 360° \`.glb\` mesh.
-3. **Anatomical Draping**: The generated garment loads automatically onto our SMPL human body model.
-4. **Controls**: Use the continuous skin-tone spectrum scrollbar (0–100%) to test against 8 diverse undertones, and use the X/Y/Z position and scale sliders to tailor the fit!`
-        } else if (lower.includes("skin") || lower.includes("contrast") || lower.includes("undertone") || lower.includes("colour")) {
-          stitchReply = `**Couture Skin Harmony & Undertone Theory**:
-• **Warm Wheatish / Golden Undertones**: Glows best against saturated jewel tones—**Madder Ruby (#c9513e)**, **Peacock Indigo (#194b65)**, and antique **Zari Gold (#aa7917)**. Minimum WCAG contrast ratio should exceed 3.5:1.
-• **Cool Pinkish / Espresso Undertones**: Shines with royal sapphire, icy pastel metallics, and emerald.
-• **Neutral Undertones**: Ideal for earthy Ajrakh palettes and dual-tone borders.
-• *Atelier Tip*: When working with deep tones, use an ivory or cream border piping to create a luminous visual bridge!`
-        } else if (lower.includes("korvai") || lower.includes("kanjeevaram") || lower.includes("banarasi")) {
-          stitchReply = `**Textile Masterclass: Korvai & Brocade**:
-• **Korvai Weaving (Kanjeevaram)**: A labour-intensive South Indian technique where the saree body and border are woven separately using two or three distinct shuttles, then meticulously interlocked by hand at the boundary. This allows contrasting solid border colours with zero thread show-through!
-• **Banarasi Kadhwa**: Each motif (booti) is hand-engraved and woven individually with no loose floats on the reverse, unlike modern Jacquard power looms. Pure heritage craftsmanship!`
-        } else if (lower.includes("placement") || lower.includes("path") || lower.includes("level")) {
-          stitchReply = `**Diagnostic Placement Assessment & Tailoring Path**:
-• Clicking **"Begin your journey"** on the homepage launches one of 6 diagnostic test variants covering 6 key disciplines (History, Weaves, Pattern Math, Colour, Construction, Sustainability).
-• Your score classifies you into:
-  - **Foundation Tier (<50%)**: Starts with grainlines, shrinkage physics, and fabric behaviour.
-  - **Intermediate Tier (50–79%)**: Starts with bodice blocks, dart manipulation, and colour contrast.
-  - **Advanced Tier (≥80%)**: Direct access to sherwani structure, fusion silhouettes, and capstone jury.
-• Your personalised path is mapped out in the **Progress tab** as an SVG wavy tailoring-stitch line!`
+        if (lower.includes("armhole") || lower.includes("depth") || lower.includes("scye") || lower.includes("sleeve")) {
+          stitchReply = `### Armhole Depth (Scye Drop) Geometry:
+• **Fundamental Rule**: Calculate armhole depth from the **Upper Chest / Ribcage**, *never* the Full Bust Apex! Drafting from full bust on a heavy cup drops the scye excessively, causing the bodice to ride up when arms are raised.
+• **Standard Kurta / Kameez**: \`Armhole Depth = Upper Chest ÷ 6 + 2.5 cm (1 inch)\`
+• **Saree Blouse (Fitted Choli)**: \`Armhole Depth = Upper Chest ÷ 6 + 1.25 cm (0.5 inch)\`
+• **Zarapkar System**: \`Armhole Depth = Chest ÷ 8 + 6.35 cm (2.5 inches)\`
+• **Deep Back Neck Deduction**: If back neck depth is > 7 inches, subtract 0.5 to 0.75 inches to prevent gaping.
+• **Sleeve Cap Height**: \`2/3 × Armhole Depth\`.`
+        } else if (lower.includes("dart") || lower.includes("katori") || lower.includes("blouse") || lower.includes("waist")) {
+          stitchReply = `### Bodice Dart Mathematics & Katori Architecture:
+• **Single Waist Dart Intake**: \`(Full Bust − Natural Waist) ÷ 8\`
+  * *Example*: For Bust 88 cm and Waist 72 cm (difference 16 cm): \`16 ÷ 8 = 2.0 cm\` dart allowance per side.
+• **Dart Apex Distance**: \`Bust ÷ 10 + 1 cm\` from Centre Front.
+• **Katori Blouse Geometry**: The bottom rounded cup of a Katori blouse MUST be cut on the **True Bias grain (45°)**. This provides natural mechanical stretch over the bust mound without requiring synthetic elastane or underwires.`
+        } else if (lower.includes("trellis") || lower.includes("3d") || lower.includes("model") || lower.includes("fit")) {
+          stitchReply = `### 3D Garment Fitting & Trellis Workflow:
+1. **Interactive Three.js Studio**: Features an anatomical SMPL human body model rendered in a clean white studio with soft ambient and directional illumination.
+2. **Continuous Skin Spectrum**: Use the horizontal scrollbar (0 to 100%) to smoothly adjust the model's skin tone across Porcelain, Golden Wheatish, Warm Honey, Bronze, Espresso, and Dark Ebony, complete with live hexadecimal readouts.
+3. **AI 3D Mesh Synthesis**:
+   - Upload any clean front-view garment image in the 3D Model Testing tab.
+   - Click **"Generate 3D Model"**.
+   - The platform uploads the asset to Cloudinary, streams it to HuggingFace's TRELLIS space, and returns an interactive 360° \`.glb\` mesh.
+4. **Spatial Transform Controls**: Use the X, Y, and Z position and scale sliders to adjust shoulder breadth, waist drape, and vertical height independently!`
+        } else if (lower.includes("skin") || lower.includes("contrast") || lower.includes("undertone") || lower.includes("colour") || lower.includes("color")) {
+          stitchReply = `### Indian Couture Skin Tone & Undertone Harmony:
+• **Golden Wheatish / Warm Honey Undertones**:
+  * *Flattering Palettes*: Saturated jewel tones—Madder Terracotta (#c9513e), Royal Indigo (#194b65), Emerald Green, and Antique Zari (#aa7917).
+  * *WCAG Contrast*: Aim for a contrast ratio > 3.5:1 against skin.
+• **Cool Pinkish / Espresso Undertones**:
+  * *Flattering Palettes*: Royal Sapphire, Rich Amethyst, Cool Fuchsia, Jade, and Silver Zari.
+• **Neutral Undertones**:
+  * Excels in natural mineral dyes like Ajrakh iron black, indigo, and madder red.
+• *Atelier Pro-Tip*: When wearing high-saturation or dark garments against deep skin, insert an ivory or champagne silk piping along the collar and armhole to create a luminous visual bridge!`
+        } else if (lower.includes("korvai") || lower.includes("kanjeevaram") || lower.includes("banarasi") || lower.includes("textile") || lower.includes("weave")) {
+          stitchReply = `### Traditional Weaves: Banarasi & Kanjeevaram:
+• **Kanjeevaram Korvai Technique**:
+  * The body and border are woven using two or three distinct shuttles on pure mulberry silk.
+  * The borders are interlocked by hand at the selvedge junction using a toothed 'temple' (*rekku*) pattern.
+  * Because warp threads are tied individually, the border has solid saturated colour without thread contamination from the body!
+• **Banarasi Kadhwa Brocade**:
+  * Each floral motif (*booti*) is hand-engraved and woven with separate spools of silver/gold zari.
+  * There are zero floating loose threads on the back of the cloth, unlike cheap power-loom Jacquards!`
+        } else if (lower.includes("dieline") || lower.includes("pattern") || lower.includes("cad") || lower.includes("measurement")) {
+          stitchReply = `### Technical Dieline Studio & CAD Vector Blueprints:
+• **Image Analysis via Gemini Vision**: Upload any garment photograph (pants, kurti, anarkali, blouse, lehenga, or sherwani). Gemini Vision detects the silhouette, grainline orientation, and seam count.
+• **CAD Vector Blueprint**: Generates an interactive SVG cutting pattern with explicit grainlines, notches, and cut-quantity indicators.
+• **Measurement Blanks**: Provides customizable drafting blanks for:
+  - Quarter Bust + Ease
+  - Waist Dart Intake
+  - Sleeve Crown Height & Inseam
+  - Crotch Depth & Thigh Circumference for pants
+  - Kali Flare Multipliers for anarkalis and lehengas.`
         } else {
-          stitchReply = `At your service! As your atelier mentor, I can help you with:
-• **Pattern Formulas**: Armhole depth, waist darts, sleeve crowns, and lehenga kali math.
-• **Textile Traditions**: Weaving mechanisms of Banarasi, Kanjeevaram, Chanderi, Ikat, and Ajrakh.
-• **Surface Craft**: Zardozi relief, Chikankari stitches, and Phulkari floss work.
-• **AI Studio Tools**: 3D Trellis mesh generation, vector CAD dieline blueprints, and Gemini vision sketch synthesis.
+          stitchReply = `### Greetings from the Atelier!
+As your resident AI master mentor, I can assist you with:
+• **Pattern Mathematics**: Zarapkar formulas for armholes, waist darts, crotch depths, and lehenga flare kalis.
+• **Living Weaves**: Weaving mechanisms of Banarasi Kadhwa, Kanjeevaram Korvai, Chanderi sheer, Patola, and Ajrakh.
+• **Surface Ornamentation**: Zardozi relief, Lucknowi Chikankari stitches, and Phulkari floss work.
+• **Skin Tone Harmony**: WCAG contrast ratio analysis and undertone matching.
+• **App Walkthroughs**: 3D Trellis mesh generation, technical CAD dielines, and diagnostic placement tests.
 
-What garment or technique would you like to explore together?`
+What garment, formula, or craft shall we explore together?`
         }
       }
 
@@ -237,19 +342,56 @@ What garment or technique would you like to explore together?`
       }
       setMessages((prev) => [...prev, stitchMessage])
     } catch (error) {
-      console.error("Stitch error:", error)
+      console.error("Stitch conversation error:", error)
       setMessages((prev) => [
         ...prev,
         {
           id: "err-" + Date.now(),
           sender: "stitch",
-          text: "My claws got tangled in the measuring tape! Please try asking again in a moment.",
+          text: "My claws got tangled in the measuring tape! Let me reset—please ask your question once more.",
           timestamp: "Just now"
         }
       ])
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Format message text with markdown-style headings, bold, and bullet points
+  const renderFormattedText = (rawText: string) => {
+    return rawText.split("\n").map((line, idx) => {
+      const trimmed = line.trim()
+      if (trimmed.startsWith("###")) {
+        return (
+          <h4 key={idx} className="font-serif font-bold text-sm text-[#172b2b] mt-2 mb-1">
+            {trimmed.replace(/^###\s*/, "")}
+          </h4>
+        )
+      }
+      if (trimmed.startsWith("•") || trimmed.startsWith("*") || trimmed.startsWith("-")) {
+        const content = trimmed.replace(/^[-•*]\s*/, "")
+        return (
+          <div key={idx} className="flex items-start gap-1.5 ml-1.5 my-1 text-xs">
+            <span className="text-[#c9513e] font-bold shrink-0">•</span>
+            <span>
+              {content.split("**").map((chunk, cIdx) =>
+                cIdx % 2 === 1 ? <strong key={cIdx} className="font-bold text-[#172b2b]">{chunk}</strong> : chunk
+              )}
+            </span>
+          </div>
+        )
+      }
+      if (!trimmed) {
+        return <div key={idx} className="h-1.5" />
+      }
+      return (
+        <p key={idx} className="my-1 text-xs leading-relaxed">
+          {line.split("**").map((chunk, cIdx) =>
+            cIdx % 2 === 1 ? <strong key={cIdx} className="font-bold text-[#172b2b]">{chunk}</strong> : chunk
+          )}
+        </p>
+      )
+    })
   }
 
   return (
@@ -298,7 +440,7 @@ What garment or technique would you like to explore together?`
       {/* Expandable Atelier Chat Window */}
       {isOpen && (
         <div
-          className="fixed bottom-24 right-6 z-[950] w-[92vw] sm:w-[420px] h-[580px] max-h-[80vh] bg-white rounded-3xl shadow-2xl border border-[#ded4c3] flex flex-col overflow-hidden animate-fadeIn"
+          className="fixed bottom-24 right-6 z-[950] w-[92vw] sm:w-[440px] h-[600px] max-h-[82vh] bg-white rounded-3xl shadow-2xl border border-[#ded4c3] flex flex-col overflow-hidden animate-fadeIn"
           style={{
             boxShadow: "0 25px 60px rgba(23, 43, 43, 0.35)",
             backdropFilter: "blur(8px)"
@@ -314,11 +456,11 @@ What garment or technique would you like to explore together?`
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-serif font-bold text-base text-white leading-none">Stitch</h3>
                   <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-[#e8b547] text-[#172b2b]">
-                    AI Mentor
+                    AI Couturier
                   </span>
                 </div>
                 <p className="text-[10px] text-[#cad5cf] mt-0.5 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#28a745] inline-block" /> Master Atelier Couturier
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#28a745] inline-block" /> Powered by Gemini
                 </p>
               </div>
             </div>
@@ -345,9 +487,11 @@ What garment or technique would you like to explore together?`
           <div className="bg-[#faf6ee] px-4 py-2 border-b border-[#e8dfd1] flex items-center justify-between text-[11px] text-[#7a5e00]">
             <span className="flex items-center gap-1.5 font-medium truncate">
               <Scissors className="w-3.5 h-3.5 text-[#c9513e]" />
-              <span>Current Studio: <strong>{currentRoute || "Main Campus"}</strong></span>
+              <span>Studio Context: <strong>{currentRoute || "Main Campus"}</strong></span>
             </span>
-            <span className="text-[10px] text-[#999] uppercase tracking-wider shrink-0 font-bold">Gemini 1.5</span>
+            <span className="text-[10px] text-[#28a745] uppercase tracking-wider shrink-0 font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#28a745]" /> Live Mentor
+            </span>
           </div>
 
           {/* Chat Messages */}
@@ -364,20 +508,14 @@ What garment or technique would you like to explore together?`
                 )}
 
                 <div
-                  className={`max-w-[82%] rounded-2xl p-3 text-xs leading-relaxed ${
+                  className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${
                     msg.sender === "user"
                       ? "bg-[#172b2b] text-white rounded-br-none shadow-sm"
                       : "bg-white text-[#2c3e3e] border border-[#e8e0d2] rounded-tl-none shadow-sm"
                   }`}
                 >
-                  <div className="whitespace-pre-wrap font-sans">
-                    {msg.text.split("\n").map((line, idx) => {
-                      // Simple markdown-style bold formatting
-                      if (line.startsWith("•") || line.startsWith("-")) {
-                        return <div key={idx} className="ml-2 my-0.5">{line}</div>
-                      }
-                      return <div key={idx} className={line.startsWith("**") ? "font-bold text-[#172b2b] mt-1" : ""}>{line}</div>
-                    })}
+                  <div className="font-sans">
+                    {msg.sender === "stitch" ? renderFormattedText(msg.text) : msg.text}
                   </div>
                   <span
                     className={`text-[9px] block text-right mt-1.5 ${
@@ -402,7 +540,7 @@ What garment or technique would you like to explore together?`
                   <img src="/Cat.png" alt="Stitch" className="w-full h-full object-contain animate-pulse" />
                 </div>
                 <div className="flex items-center gap-1 font-medium">
-                  <span>Stitch is drafting</span>
+                  <span>Stitch is formulating</span>
                   <span className="animate-pulse">.</span>
                   <span className="animate-pulse" style={{ animationDelay: "200ms" }}>.</span>
                   <span className="animate-pulse" style={{ animationDelay: "400ms" }}>.</span>
