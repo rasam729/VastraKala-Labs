@@ -2,7 +2,7 @@
 
 ## Team
 
-- Team name: VastraKala
+- Team name: Trikona
 - Project name: VastraKala Labs (VastraShastra: The Science & Soul of Indian Couture)
 - College: R. V. College of Engineering / R. N. S. Institute of Technology
 - Team members:
@@ -21,8 +21,8 @@ VastraKala Labs is an AI-powered digital atelier and immersive learning platform
 > Slides: Google Slides with view access for anyone with the link. 8 slides at most.
 
 - Code repository: https://github.com/rasam729/VastraKala-Labs
-- Demo video: 
-- Slides: 
+- Demo video: https://drive.google.com/file/d/1Ib-BjXhaDJieawSz_RdkxufxTcoycsF0/view?usp=drivesdk
+- Slides: https://docs.google.com/presentation/d/1vCvF6GrqGoGrVb9Nytq495wBsslEUoW5/edit?usp=sharing&ouid=118341578189261587774&rtpof=true&sd=true
 - Deployed URL (optional): 
 
 ## Short answers
