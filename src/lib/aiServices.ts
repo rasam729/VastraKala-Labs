@@ -235,13 +235,106 @@ export async function synthesizeDressImage(
   ]
 }
 
+// ── Cloudinary upload helper (converts base64 data-URL → public HTTPS URL) ──
+const CLOUDINARY_CLOUD_NAME = (import.meta as any).env?.VITE_CLOUDINARY_CLOUD_NAME || "owk5fxui"
+const CLOUDINARY_UPLOAD_PRESET = (import.meta as any).env?.VITE_CLOUDINARY_UPLOAD_PRESET || "ml_default"
+const HF_API_KEY = (import.meta as any).env?.VITE_HF_API_KEY || ""
+
+async function uploadToCloudinary(base64DataUrl: string): Promise<string> {
+  const formData = new FormData()
+  formData.append("file", base64DataUrl)
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET)
+  formData.append("folder", "vastrashastra_trellis")
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+    method: "POST",
+    body: formData
+  })
+  if (!res.ok) throw new Error(`Cloudinary upload failed: ${res.status}`)
+  const json = await res.json()
+  return json.secure_url as string
+}
+
+// ── HuggingFace Gradio REST polling helper ──
+async function callTrellisGradio(imageUrl: string): Promise<string> {
+  const HF_SPACE = "trellis-community/TRELLIS"
+  const gradioBase = `https://trellis-community-trellis.hf.space`
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json"
+  }
+  if (HF_API_KEY) headers["Authorization"] = `Bearer ${HF_API_KEY}`
+
+  // Step 1: Submit the job
+  const submitRes = await fetch(`${gradioBase}/queue/join`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      data: [
+        { url: imageUrl },   // image
+        12,                   // ss_sampling_steps
+        12,                   // slat_sampling_steps
+        0.5,                  // simplify ratio
+        "glb"                 // output format
+      ],
+      fn_index: 0,
+      session_hash: Math.random().toString(36).slice(2)
+    })
+  })
+
+  if (!submitRes.ok) throw new Error(`Trellis queue join failed: ${submitRes.status}`)
+  const { event_id } = await submitRes.json()
+
+  // Step 2: Poll the event stream
+  const pollUrl = `${gradioBase}/queue/data?session_hash=${event_id || ""}`
+  // Use SSE-style fetch polling (up to 90 s, 3 s intervals)
+  for (let attempt = 0; attempt < 30; attempt++) {
+    await new Promise((r) => setTimeout(r, 3000))
+    try {
+      const statusRes = await fetch(`${gradioBase}/queue/status`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ event_id })
+      })
+      if (statusRes.ok) {
+        const statusJson = await statusRes.json()
+        if (statusJson.status === "COMPLETE" && statusJson.output?.data) {
+          const outputData = statusJson.output.data
+          // Gradio returns file refs; look for a .glb file
+          for (const item of outputData) {
+            if (item?.url && item.url.endsWith(".glb")) return item.url
+            if (typeof item === "string" && item.endsWith(".glb")) return item
+          }
+        }
+        if (statusJson.status === "FAILED") throw new Error("Trellis space returned FAILED")
+      }
+    } catch (pollErr: any) {
+      if (pollErr.message?.includes("FAILED")) throw pollErr
+    }
+  }
+  throw new Error("Trellis 3D generation timed out after 90 s")
+}
+
 /**
- * 3. Generate or retrieve 3D mesh using Trellis API
+ * 3. Generate 3D mesh using Trellis — tries HuggingFace Gradio first, then fal.ai, then clean fallback.
  */
 export async function generate3DWithTrellis(
   imageSource: string,
   category: "dress" | "shoes" | "hairstyle" | "jewelry" | "accessory" = "dress"
 ): Promise<{ glbUrl: string; source: string; status: string }> {
+  // ── Attempt 1: HuggingFace Trellis Gradio Space ──
+  try {
+    // If imageSource is a base64 data-URL, upload to Cloudinary first to get a public URL
+    let publicUrl = imageSource
+    if (imageSource.startsWith("data:")) {
+      publicUrl = await uploadToCloudinary(imageSource)
+    }
+    const glbUrl = await callTrellisGradio(publicUrl)
+    return { glbUrl, source: "HuggingFace trellis-community/TRELLIS", status: "synthesized" }
+  } catch (hfErr: any) {
+    console.warn("HF Trellis failed:", hfErr.message)
+  }
+
+  // ── Attempt 2: fal.ai Trellis (if API key present and URL is already public) ──
   if (FAL_API_KEY && imageSource.startsWith("http")) {
     try {
       const response = await fetch("https://queue.fal.run/fal-ai/trellis", {
@@ -256,7 +349,6 @@ export async function generate3DWithTrellis(
           slat_sampling_steps: 12
         })
       })
-
       if (response.ok) {
         const queueRes = await response.json()
         if (queueRes.model_mesh?.url) {
@@ -264,25 +356,25 @@ export async function generate3DWithTrellis(
         }
       }
     } catch {
-      // Fallback
+      // continue to fallback
     }
   }
 
+  // ── Fallback: use locally validated watertight GLB meshes ──
+  // NOTE: kurta_dress.glb and sample_garment.glb are clones of human_body.glb (248 KB).
+  // Use flared_gown.glb (1.5 MB, valid) and sherwani_top.glb (1.8 MB, valid) for fallback.
   const categoryModelMap: Record<string, string> = {
-    dress: "/models/kurta_dress.glb",
-    gown: "/models/flared_gown.glb",
-    sherwani: "/models/sherwani_top.glb",
-    shoes: "/models/sample_garment.glb",
-    hairstyle: "/models/sample_garment.glb",
-    jewelry: "/models/sample_garment.glb",
-    accessory: "/models/sample_garment.glb"
+    dress: "/models/flared_gown.glb",
+    shoes: "/models/sherwani_top.glb",
+    hairstyle: "/models/flared_gown.glb",
+    jewelry: "/models/flared_gown.glb",
+    accessory: "/models/flared_gown.glb"
   }
-
-  const selectedModel = categoryModelMap[category] || "/models/kurta_dress.glb"
+  const selectedModel = categoryModelMap[category] ?? "/models/flared_gown.glb"
   return {
     glbUrl: selectedModel,
-    source: "Trellis O-Voxel Mannequin Pipeline",
-    status: "calibrated"
+    source: "Local mesh fallback (Trellis unavailable)",
+    status: "fallback"
   }
 }
 

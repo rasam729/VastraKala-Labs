@@ -442,7 +442,7 @@ export default function ThreeModelTester() {
     if (!target) return
 
     setIsSynthesizing(true)
-    setStatusMessage(`Synthesizing 3D mesh for ${target.name} via Trellis O-Voxel manifold...`)
+    setStatusMessage(`Generating 3D model for "${target.name}"... this may take up to 90 seconds.`)
 
     setLayers((prev) =>
       prev.map((l) => (l.id === layerId ? { ...l, status: "synthesizing" } : l))
@@ -468,9 +468,9 @@ export default function ThreeModelTester() {
             : l
         )
       )
-      setStatusMessage(`Trellis mesh loaded successfully for ${target.name}!`)
+      setStatusMessage(`✅ 3D model loaded for "${target.name}"!`)
     } catch (err: any) {
-      setStatusMessage(`Trellis generation failed: ${err.message}`)
+      setStatusMessage(`❌ 3D generation failed: ${err.message}`)
       setLayers((prev) =>
         prev.map((l) => (l.id === layerId ? { ...l, status: "error" } : l))
       )
@@ -509,7 +509,7 @@ export default function ThreeModelTester() {
         }
         setLayers((prev) => [...prev, newLayer])
         setActiveLayerId(newId)
-        setStatusMessage(`Imported ${file.name}. Click 'Send to Trellis 3D' to synthesize mesh.`)
+        setStatusMessage(`Imported ${file.name}. Click 'Generate 3D Model' to synthesize mesh.`)
       }
       reader.readAsDataURL(file)
     })
@@ -586,11 +586,11 @@ export default function ThreeModelTester() {
       <div className="bg-[#172b2b] text-white p-5 rounded-2xl border border-[#28453c] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="text-[10px] uppercase font-bold tracking-widest text-[#e8b547] flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" /> Three.js 3D Viewport & Trellis Multi-Asset Lab
+            <Sparkles className="w-3.5 h-3.5" /> Three.js 3D Viewport &amp; Multi-Asset Layering Lab
           </span>
           <h2 className="text-xl lg:text-2xl font-serif mt-0.5">3D Model Testing Environment</h2>
           <p className="text-xs text-[#cad5cf] mt-1 max-w-2xl">
-            Constant GarmentForge human body avatar in clean daylight studio. Upload dress, hairstyle, shoes, or accessories, synthesize them via Trellis 3D, and adjust X, Y, Z translation, scale, and rotation.
+            Constant GarmentForge human body avatar in clean daylight studio. Upload dress, hairstyle, shoes, or accessories, generate 3D models, and adjust X, Y, Z translation, scale, and rotation.
           </p>
         </div>
 
@@ -828,7 +828,7 @@ export default function ThreeModelTester() {
                             }}
                             className="px-2 py-1 bg-[#e8b547] hover:bg-[#d4a035] text-[#172b2b] text-[10px] font-bold rounded flex items-center gap-1"
                           >
-                            <Sparkles className="w-2.5 h-2.5" /> Trellis
+                            <Sparkles className="w-2.5 h-2.5" /> Generate 3D Model
                           </button>
                         )}
 
