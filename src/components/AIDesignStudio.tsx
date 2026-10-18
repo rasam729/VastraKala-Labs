@@ -1,5 +1,21 @@
 import React, { useRef, useState, useEffect } from "react"
-import { Sparkles, Palette, Send, RotateCcw, Download, CheckCircle, ArrowRight, FileCheck, Layers } from "lucide-react"
+import {
+  Sparkles,
+  Palette,
+  Send,
+  RotateCcw,
+  Undo2,
+  Download,
+  CheckCircle,
+  ArrowRight,
+  Upload,
+  Image as ImageIcon,
+  Sliders,
+  FileCheck,
+  Layers,
+  Info
+} from "lucide-react"
+import { analyzeSketchWithAI, synthesizeDressImage, type SketchNuances, type SketchAnalysisResult } from "../lib/aiServices"
 
 interface AIDesignStudioProps {
   onDressGenerated?: (dressData: {
@@ -27,6 +43,13 @@ const COLLAR_STYLES = [
   { id: "round", label: "Jewel Round", note: "Minimalist Indian classic" }
 ]
 
+const HEMLINE_STYLES = [
+  { id: "flared", label: "Flared 8-12 Kalis", note: "360° umbrella circumference" },
+  { id: "asymmetric", label: "High-Low Asymmetric", note: "Modern fusion drape" },
+  { id: "straight", label: "Straight Column Slit", note: "Minimalist traditional look" },
+  { id: "scalloped", label: "Scalloped Cutwork", note: "Embroidered border curve" }
+]
+
 const COLOR_SUGGESTIONS = [
   { name: "Sindoor Terracotta", hex: "#c9513e" },
   { name: "Royal Zari Gold", hex: "#e8b547" },
@@ -39,33 +62,40 @@ const COLOR_SUGGESTIONS = [
 
 export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AIDesignStudioProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Undo stack for canvas states
+  const historyStackRef = useRef<ImageData[]>([])
+  const [canUndo, setCanUndo] = useState(false)
+
   const [isDrawing, setIsDrawing] = useState(false)
   const [strokeColor, setStrokeColor] = useState("#172b2b")
   const [strokeWidth, setStrokeWidth] = useState(3)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
 
-  // Style configurations
+  // Sketch Input Mode: Drawn Canvas vs Uploaded Sketch Image
+  const [sketchInputMode, setSketchInputMode] = useState<"canvas" | "upload">("canvas")
+  const [uploadedSketchUrl, setUploadedSketchUrl] = useState<string | null>(null)
+  const [uploadedFileName, setUploadedFileName] = useState<string>("")
+
+  // Style configurations & Specific Design Nuances
   const [garmentType, setGarmentType] = useState("Anarkali Suit")
   const [selectedSleeve, setSelectedSleeve] = useState("puffed")
   const [selectedCollar, setSelectedCollar] = useState("mandarin")
   const [selectedHemline, setSelectedHemline] = useState("flared")
+  const [selectedFabric, setSelectedFabric] = useState("Banarasi Katan Silk")
   const [selectedColor, setSelectedColor] = useState("#c9513e")
-  const [customPrompt, setCustomPrompt] = useState("Fine Zardozi gold wire embroidery on sleeves and hemline border, fluid mulberry silk drape")
+  const [customPrompt, setCustomPrompt] = useState(
+    "Fine Zardozi gold wire embroidery on sleeves and hemline border, fluid mulberry silk drape with antique Zari borders"
+  )
 
-  // Generated options
+  // Generated options & AI Analysis report
   const [generatedImages, setGeneratedImages] = useState<string[]>([])
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0)
-  const [detailedAiReport, setDetailedAiReport] = useState<{
-    silhouette: string
-    proportionsScore: number
-    seamAnalysis: string
-    fabricRecommendation: string
-    corrections: string[]
-    nextSteps: string
-  } | null>(null)
+  const [detailedAiReport, setDetailedAiReport] = useState<SketchAnalysisResult | null>(null)
 
-  // Setup canvas with metric drafting grid (similar to dieline studio)
+  // Setup canvas with metric drafting grid
   const resetCanvasGrid = () => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -111,17 +141,52 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
     ctx.lineTo(canvas.width / 2, canvas.height - 20)
     ctx.stroke()
     ctx.setLineDash([])
+
+    // Clear history stack
+    historyStackRef.current = []
+    setCanUndo(false)
   }
 
   useEffect(() => {
     resetCanvasGrid()
   }, [])
 
+  // Push canvas state before starting a new stroke for Undo
+  const pushCanvasState = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+    const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    historyStackRef.current.push(snapshot)
+    if (historyStackRef.current.length > 25) {
+      historyStackRef.current.shift()
+    }
+    setCanUndo(true)
+  }
+
+  // Handle Undo
+  const handleUndo = () => {
+    if (historyStackRef.current.length === 0) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const previousState = historyStackRef.current.pop()
+    if (previousState) {
+      ctx.putImageData(previousState, 0, 0)
+    }
+    setCanUndo(historyStackRef.current.length > 0)
+  }
+
   const startDraw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext("2d")
     if (!ctx) return
+
+    pushCanvasState()
 
     const rect = canvas.getBoundingClientRect()
     const clientX = "touches" in e ? e.touches[0].clientX : e.clientX
@@ -159,69 +224,83 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
     setIsDrawing(false)
   }
 
-  // Save sketch as PNG and trigger detailed Gemini AI analysis
-  const handleSavePngAndAnalyze = async () => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+  // Handle Upload of Student Sketch Image from Storage
+  const handleSketchFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
 
-    // 1. Export as PNG download
-    const dataUrl = canvas.toDataURL("image/png")
-    const downloadLink = document.createElement("a")
-    downloadLink.download = `vastra-sketch-${Date.now()}.png`
-    downloadLink.href = dataUrl
-    downloadLink.click()
+    setUploadedFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      const dataUrl = evt.target?.result as string
+      setUploadedSketchUrl(dataUrl)
+      setSketchInputMode("upload")
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ""
+  }
 
-    // 2. Trigger Detailed Gemini Vision Analysis
+  // Save current active sketch (Canvas or Uploaded) and trigger Gemini AI Analysis
+  const handleAnalyzeWithGemini = async () => {
+    let activeSketchDataUrl: string | null = null
+
+    if (sketchInputMode === "upload" && uploadedSketchUrl) {
+      activeSketchDataUrl = uploadedSketchUrl
+    } else if (canvasRef.current) {
+      activeSketchDataUrl = canvasRef.current.toDataURL("image/png")
+      // Also download copy for student's portfolio
+      const downloadLink = document.createElement("a")
+      downloadLink.download = `vastra-sketch-${Date.now()}.png`
+      downloadLink.href = activeSketchDataUrl
+      downloadLink.click()
+    }
+
+    if (!activeSketchDataUrl) return
+
     setIsAnalyzing(true)
     setDetailedAiReport(null)
 
-    // Send payload to backend / fallback to rich evaluation
+    const nuances: SketchNuances = {
+      style: garmentType,
+      sleeve: selectedSleeve,
+      collar: selectedCollar,
+      hemline: selectedHemline,
+      fabric: selectedFabric,
+      color: selectedColor,
+      customNotes: customPrompt
+    }
+
     try {
-      const response = await fetch("http://localhost:8000/api/analyse-sketch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64_image: dataUrl })
-      }).catch(() => null)
-
-      const apiResult = response && response.ok ? await response.json() : null
-
-      setTimeout(() => {
-        setIsAnalyzing(false)
-        setDetailedAiReport({
-          silhouette: apiResult?.detected_silhouette || "Fitted empire-waist bodice with 8-kali flared flared Kalidar skirt",
-          proportionsScore: 89,
-          seamAnalysis: "Shoulder slope is drafted at an anatomically accurate 18° drop. Apex line aligns cleanly with natural bust ratio (Bust ÷ 4 + 2.5cm).",
-          fabricRecommendation: "Mulberry Silk, Chanderi count 100s, or Tussar Silk with Gota border finish.",
-          corrections: [
-            "Waist side seam: increase dart intake by 0.5 cm to prevent underarm gaping.",
-            "Armhole curvature: smooth the lower depth curve using a French curve tool.",
-            "Hemline flare: add 1.5 cm seam allowance before cutting kali panels."
-          ],
-          nextSteps: "Proceed to the 3D Fit Lab to drape this silhouette on the GarmentForge parametric body model, then verify your cut measurements in the Dieline Lab."
-        })
-      }, 1600)
-    } catch {
+      const analysis = await analyzeSketchWithAI(activeSketchDataUrl, nuances)
+      setDetailedAiReport(analysis)
+    } catch (err: any) {
+      console.warn("Analysis error:", err)
+    } finally {
       setIsAnalyzing(false)
     }
   }
 
-  // Generate dress renders from prompt + chosen styles
-  const handleGenerateRenders = () => {
+  // Generate couture renders using prompt + design nuances + reference sketch
+  const handleGenerateRenders = async () => {
     setIsGenerating(true)
 
-    setTimeout(() => {
-      setIsGenerating(false)
-      const mockResults = [
-        "https://images.unsplash.com/photo-1610030469983-98e550d6193c?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=800",
-        "https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=800",
-        "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=800"
-      ]
-      setGeneratedImages(mockResults)
+    const promptToUse = detailedAiReport?.synthesisPrompt || `Vogue India haute couture fashion editorial, elegant Indian model wearing a bespoke ${garmentType} in ${selectedColor} ${selectedFabric}, featuring ${selectedSleeve} sleeves and ${selectedCollar} collar, ${customPrompt}, studio dramatic lighting, award-winning editorial, 8k resolution`
+
+    let referenceImg: string | undefined = undefined
+    if (sketchInputMode === "upload" && uploadedSketchUrl) {
+      referenceImg = uploadedSketchUrl
+    } else if (canvasRef.current) {
+      referenceImg = canvasRef.current.toDataURL("image/png")
+    }
+
+    try {
+      const images = await synthesizeDressImage(promptToUse, referenceImg)
+      setGeneratedImages(images)
       setSelectedImageIndex(0)
 
-      if (onDressGenerated) {
+      if (onDressGenerated && images.length > 0) {
         onDressGenerated({
-          imageUrl: mockResults[0],
+          imageUrl: images[0],
           color: selectedColor,
           style: {
             sleeve: selectedSleeve,
@@ -229,89 +308,190 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
             hemline: selectedHemline,
             type: garmentType
           },
-          prompt: customPrompt
+          prompt: promptToUse
         })
       }
-    }, 2000)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  // Download Synthesized Dress Image as PNG
+  const handleDownloadGeneratedImage = (imageUrl: string, index: number) => {
+    const a = document.createElement("a")
+    a.download = `vastrashastra-couture-dress-0${index + 1}.png`
+    a.href = imageUrl
+    a.target = "_blank"
+    a.click()
   }
 
   return (
     <div className="space-y-8 bg-[#fdfbf7] p-6 lg:p-8 rounded-2xl border border-[#ded8cd]">
-      {/* Header */}
+      {/* Studio Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-4 border-b border-[#e8e0d2]">
         <div>
-          <span className="text-xs uppercase font-bold tracking-widest text-[#c9513e]">AI Sketch Studio</span>
+          <span className="text-xs uppercase font-bold tracking-widest text-[#c9513e]">Sketch & AI Studio</span>
           <h2 className="text-2xl lg:text-3xl font-serif text-[#172b2b] mt-1">
-            Design & Draft on Metric Canvas
+            Draw, Upload & Synthesize Couture
           </h2>
           <p className="text-sm text-[#666] max-w-2xl mt-1">
-            Draw your garment silhouette on the 1:5 scale grid. Save your draft as a high-resolution PNG for in-depth Gemini AI analysis and pattern suggestions.
+            Draft on the 1:5 scale metric grid or upload your hand-drawn sketch from storage. Gemini analyzes your proportions, combines your specific design nuances, and generates a photorealistic couture dress with full download options.
           </p>
         </div>
 
         <button
-          onClick={handleSavePngAndAnalyze}
+          onClick={handleAnalyzeWithGemini}
           disabled={isAnalyzing}
           className="flex items-center gap-2 px-5 py-3 rounded-lg bg-[#c9513e] hover:bg-[#b04332] text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md disabled:opacity-50"
         >
-          <Download className="w-4 h-4 text-[#e8b547]" />
-          {isAnalyzing ? "Analyzing PNG with Gemini..." : "Save PNG & Analyze with Gemini"}
+          <Sparkles className="w-4 h-4 text-[#e8b547]" />
+          {isAnalyzing ? "Analyzing Sketch with Gemini..." : "Analyze Sketch with Gemini AI"}
         </button>
       </div>
 
       {/* Main Studio Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Metric Canvas Studio */}
-        <div className="lg:col-span-6 flex flex-col gap-3">
-          <div className="flex justify-between items-center bg-[#f5efe2] px-4 py-2.5 rounded-lg border border-[#e5dccf] text-xs">
-            <span className="font-bold text-[#172b2b]">1:5 Scale Drafting Grid</span>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                {["#172b2b", "#c9513e", "#194b65", "#365540"].map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setStrokeColor(c)}
-                    className={`w-5 h-5 rounded-full border ${strokeColor === c ? "ring-2 ring-[#c9513e]" : ""}`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
+        {/* Left Column: Metric Drawing Canvas & Upload Section */}
+        <div className="lg:col-span-6 flex flex-col gap-4">
+          {/* Sketch Source Mode Switcher */}
+          <div className="flex justify-between items-center bg-[#f5efe2] p-1.5 rounded-xl border border-[#e5dccf] text-xs">
+            <div className="flex items-center gap-1">
               <button
-                onClick={resetCanvasGrid}
-                className="flex items-center gap-1 text-[#c9513e] font-semibold hover:underline"
+                onClick={() => setSketchInputMode("canvas")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                  sketchInputMode === "canvas" ? "bg-[#172b2b] text-white shadow" : "text-[#555] hover:text-[#172b2b]"
+                }`}
               >
-                <RotateCcw className="w-3.5 h-3.5" /> Clear
+                1:5 Scale Drafting Grid
+              </button>
+              <button
+                onClick={() => setSketchInputMode("upload")}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                  sketchInputMode === "upload" ? "bg-[#172b2b] text-white shadow" : "text-[#555] hover:text-[#172b2b]"
+                }`}
+              >
+                Uploaded Sketch Image
               </button>
             </div>
+
+            {/* Undo & Clear for Canvas */}
+            {sketchInputMode === "canvas" && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleUndo}
+                  disabled={!canUndo}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-[#172b2b] bg-white rounded border border-[#ded4c3] hover:bg-[#faf7f0] disabled:opacity-40 transition-all"
+                  title="Undo last stroke"
+                >
+                  <Undo2 className="w-3.5 h-3.5" /> Undo
+                </button>
+                <button
+                  onClick={resetCanvasGrid}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-[#c9513e] bg-white rounded border border-[#ded4c3] hover:bg-[#fbf2f0] transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Clear
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="relative border border-[#d8cdbe] rounded-xl overflow-hidden bg-[#faf7f0] shadow-inner">
-            <canvas
-              ref={canvasRef}
-              width={650}
-              height={520}
-              className="w-full h-[430px] touch-none cursor-crosshair"
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={stopDraw}
-              onMouseLeave={stopDraw}
-              onTouchStart={startDraw}
-              onTouchMove={draw}
-              onTouchEnd={stopDraw}
-            />
-          </div>
+          {/* Mode 1: Metric Canvas */}
+          {sketchInputMode === "canvas" ? (
+            <div className="space-y-2">
+              <div className="relative border border-[#d8cdbe] rounded-xl overflow-hidden bg-[#faf7f0] shadow-inner">
+                <canvas
+                  ref={canvasRef}
+                  width={650}
+                  height={500}
+                  className="w-full h-[400px] touch-none cursor-crosshair"
+                  onMouseDown={startDraw}
+                  onMouseMove={draw}
+                  onMouseUp={stopDraw}
+                  onMouseLeave={stopDraw}
+                  onTouchStart={startDraw}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDraw}
+                />
+              </div>
 
-          <div className="flex justify-between items-center text-[11px] text-[#777] px-1">
-            <span>Dashed center red axis indicates front-fold alignment</span>
-            <span>Grid: 25px = 5 cm standard scale</span>
+              <div className="flex justify-between items-center text-[11px] text-[#777] px-1">
+                <span>Dashed center red axis indicates front-fold alignment</span>
+                <span>Grid: 25px = 5 cm standard drafting scale</span>
+              </div>
+            </div>
+          ) : (
+            /* Mode 2: Uploaded Sketch Preview */
+            <div className="border-2 border-dashed border-[#d8cdbe] rounded-xl p-6 bg-[#faf7f0] text-center space-y-4">
+              {uploadedSketchUrl ? (
+                <div className="space-y-3">
+                  <div className="relative max-h-[350px] overflow-hidden rounded-lg border border-[#e0d6c5] shadow">
+                    <img
+                      src={uploadedSketchUrl}
+                      alt="Uploaded student sketch"
+                      className="w-full h-72 object-contain bg-white"
+                    />
+                  </div>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-semibold text-[#172b2b] truncate">{uploadedFileName}</span>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-[#c9513e] font-bold hover:underline"
+                    >
+                      Change Image
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-12 space-y-3">
+                  <div className="w-14 h-14 mx-auto rounded-full bg-[#f0e8d8] flex items-center justify-center text-[#c9513e]">
+                    <Upload className="w-7 h-7" />
+                  </div>
+                  <h4 className="font-serif text-lg text-[#172b2b]">Upload Your Hand-Drawn Sketch</h4>
+                  <p className="text-xs text-[#666] max-w-sm mx-auto">
+                    Take a photo of your paper sketch or export your digital drawing (PNG, JPG, WEBP). Gemini will analyze its construction lines and seam placements.
+                  </p>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-5 py-2.5 bg-[#172b2b] hover:bg-[#c9513e] text-white text-xs font-bold rounded-lg shadow transition-all"
+                  >
+                    Select File from Storage
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Hidden File Input for Sketch Upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleSketchFileUpload}
+            className="hidden"
+          />
+
+          {/* Under-Grid Upload Bar (Always Accessible) */}
+          <div className="p-3 bg-[#f5efe2] rounded-xl border border-[#e5dccf] flex items-center justify-between text-xs">
+            <span className="text-[#555] font-medium flex items-center gap-1.5">
+              <Upload className="w-3.5 h-3.5 text-[#c9513e]" />
+              Prefer uploading an existing paper sketch?
+            </span>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 bg-white hover:bg-[#fbf2f0] text-[#c9513e] font-bold rounded-lg border border-[#ded4c3] transition-all"
+            >
+              Upload Sketch Image
+            </button>
           </div>
 
           {/* Detailed Gemini AI Analysis Report */}
           {detailedAiReport && (
-            <div className="p-5 bg-[#faf7f0] border border-[#e0d6c5] rounded-xl text-xs text-[#234232] space-y-3 animate-fadeIn">
+            <div className="p-5 bg-[#faf7f0] border border-[#e0d6c5] rounded-xl text-xs text-[#234232] space-y-3 shadow-sm animate-fadeIn">
               <div className="flex justify-between items-center pb-2 border-b border-[#e2d6c4]">
                 <strong className="font-bold text-[#1a5b3a] flex items-center gap-2 text-sm">
-                  <CheckCircle className="w-4 h-4 text-[#2c7a4b]" /> Gemini AI Detailed Design Analysis
+                  <CheckCircle className="w-4 h-4 text-[#2c7a4b]" /> Gemini AI Couture Analysis
                 </strong>
                 <span className="bg-[#28453c] text-white px-2.5 py-0.5 rounded font-mono font-bold">
                   Score: {detailedAiReport.proportionsScore}%
@@ -344,19 +524,19 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
           )}
         </div>
 
-        {/* Right: Structural Parts Selector & Color Theory */}
+        {/* Right Column: Specific Design Nuances & Style Customization */}
         <div className="lg:col-span-6 flex flex-col gap-5">
           {/* Garment Silhouette Type */}
           <div>
             <label className="block text-xs uppercase font-bold text-[#888] tracking-wider mb-2">
-              Silhouette Category
+              1. Silhouette Category
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {["Anarkali Suit", "Ghagra / Lehenga", "Kurta & Churidar"].map((type) => (
+              {["Anarkali Suit", "Ghagra / Lehenga", "Kurta & Churidar", "Mughal Sherwani", "Saree Blouse", "Indo-Western Gown"].map((type) => (
                 <button
                   key={type}
                   onClick={() => setGarmentType(type)}
-                  className={`p-2.5 rounded-lg border text-xs font-semibold text-center transition-all ${
+                  className={`p-2 rounded-lg border text-xs font-semibold text-center transition-all ${
                     garmentType === type
                       ? "border-[#c9513e] bg-[#fbf2f0] text-[#c9513e]"
                       : "border-[#e0d6c5] bg-white text-[#555] hover:border-[#bbb]"
@@ -371,7 +551,7 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
           {/* Sleeve Style Selector */}
           <div>
             <label className="block text-xs uppercase font-bold text-[#888] tracking-wider mb-2">
-              Sleeve Architecture
+              2. Sleeve Architecture
             </label>
             <div className="grid grid-cols-2 gap-2">
               {SLEEVE_STYLES.map((s) => (
@@ -394,7 +574,7 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
           {/* Collar & Neckline */}
           <div>
             <label className="block text-xs uppercase font-bold text-[#888] tracking-wider mb-2">
-              Collar & Neckline Design
+              3. Collar & Neckline Cut
             </label>
             <div className="grid grid-cols-3 gap-2">
               {COLLAR_STYLES.map((c) => (
@@ -413,10 +593,55 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
             </div>
           </div>
 
+          {/* Hemline Flare */}
+          <div>
+            <label className="block text-xs uppercase font-bold text-[#888] tracking-wider mb-2">
+              4. Hemline Geometry
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {HEMLINE_STYLES.map((h) => (
+                <button
+                  key={h.id}
+                  onClick={() => setSelectedHemline(h.id)}
+                  className={`p-2.5 rounded-lg border text-left transition-all ${
+                    selectedHemline === h.id
+                      ? "border-[#c9513e] bg-[#fbf2f0] text-[#c9513e]"
+                      : "border-[#e0d6c5] bg-white text-[#555] hover:border-[#bbb]"
+                  }`}
+                >
+                  <strong className="block text-xs font-bold">{h.label}</strong>
+                  <span className="text-[10px] text-[#777] block mt-0.5">{h.note}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Fabric & Material */}
+          <div>
+            <label className="block text-xs uppercase font-bold text-[#888] tracking-wider mb-2">
+              5. Regional Fabric & Weave
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {["Banarasi Katan Silk", "Chanderi Brocade", "Kanchipuram Silk", "Raw Tussar Silk", "Mulberry Georgette", "Royal Velvet"].map((fab) => (
+                <button
+                  key={fab}
+                  onClick={() => setSelectedFabric(fab)}
+                  className={`p-2 rounded-lg border text-xs font-medium text-center transition-all ${
+                    selectedFabric === fab
+                      ? "border-[#c9513e] bg-[#fbf2f0] text-[#c9513e]"
+                      : "border-[#e0d6c5] bg-white text-[#555]"
+                  }`}
+                >
+                  {fab}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Colour Palette Selection */}
           <div>
             <label className="block text-xs uppercase font-bold text-[#888] tracking-wider mb-2">
-              Fabric Hue & Zari Accent
+              6. Fabric Hue & Zari Accent
             </label>
             <div className="flex items-center gap-2 flex-wrap">
               {COLOR_SUGGESTIONS.map((col) => (
@@ -436,18 +661,21 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
             </div>
           </div>
 
-          {/* Custom prompt detail */}
+          {/* Specific Design Nuances Input */}
           <div>
             <label className="block text-xs uppercase font-bold text-[#888] tracking-wider mb-1.5">
-              Specific Design Nuances (Fabric, Motifs, Drapes)
+              7. Specific Design Nuances & Notes (Included in AI Prompt)
             </label>
-            <input
-              type="text"
+            <textarea
+              rows={3}
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="e.g. Kashmiri Aari embroidery, Banarasi brocade border, pleated waist..."
+              placeholder="e.g. Kashmiri Aari needlework motifs, gold scalloped Gota borders on wrists and hemline, pleated bias waist drape..."
               className="w-full text-xs p-3 rounded-lg border border-[#dcd2c2] bg-white focus:outline-none focus:border-[#c9513e]"
             />
+            <span className="text-[11px] text-[#777] mt-1 block">
+              These design nuances will be directly merged into the Gemini image synthesis prompt.
+            </span>
           </div>
 
           {/* Generate Button */}
@@ -457,27 +685,39 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
             className="w-full py-3.5 rounded-lg bg-[#172b2b] hover:bg-[#28453c] text-white font-bold text-xs uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50"
           >
             <Send className="w-4 h-4 text-[#e8b547]" />
-            {isGenerating ? "Synthesizing 2D Photorealistic Render..." : "Generate Couture Render"}
+            {isGenerating ? "Synthesizing Photorealistic Dress Image..." : "Generate Couture Dress Image"}
           </button>
         </div>
       </div>
 
-      {/* Generated Results & Hand-off to 3D Fit Lab */}
+      {/* Generated Results & Download Options */}
       {generatedImages.length > 0 && (
-        <div className="mt-8 pt-6 border-t border-[#e8e0d2]">
-          <div className="flex justify-between items-center mb-4">
+        <div className="mt-8 pt-6 border-t border-[#e8e0d2] space-y-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div>
-              <span className="text-[10px] uppercase font-bold tracking-widest text-[#aa7917]">Synthesized Garment</span>
-              <h3 className="text-xl font-serif text-[#172b2b]">Select Final Look for 3D Digital Twin</h3>
+              <span className="text-[10px] uppercase font-bold tracking-widest text-[#aa7917]">
+                AI Synthesized Garment
+              </span>
+              <h3 className="text-xl font-serif text-[#172b2b]">Generated Couture Looks</h3>
             </div>
-            {onNavigateTo3D && (
+
+            <div className="flex items-center gap-2">
               <button
-                onClick={onNavigateTo3D}
-                className="flex items-center gap-2 px-4 py-2 bg-[#28453c] text-white text-xs font-bold rounded-lg hover:bg-[#1f3730] shadow transition-all"
+                onClick={() => handleDownloadGeneratedImage(generatedImages[selectedImageIndex], selectedImageIndex)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#c9513e] hover:bg-[#b04332] text-white text-xs font-bold rounded-lg shadow transition-all"
               >
-                Launch in 3D Fit Lab <ArrowRight className="w-4 h-4" />
+                <Download className="w-4 h-4" /> Download Selected Look (PNG)
               </button>
-            )}
+
+              {onNavigateTo3D && (
+                <button
+                  onClick={onNavigateTo3D}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#28453c] text-white text-xs font-bold rounded-lg hover:bg-[#1f3730] shadow transition-all"
+                >
+                  Send to 3D Testing Lab <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -489,11 +729,30 @@ export default function AIDesignStudio({ onDressGenerated, onNavigateTo3D }: AID
                   selectedImageIndex === idx ? "border-[#c9513e] ring-4 ring-[#c9513e]/20" : "border-transparent"
                 }`}
               >
-                <img src={img} alt="Generated couture look" className="w-full h-72 object-cover group-hover:scale-105 transition-transform duration-300" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-4">
-                  <div className="text-white">
-                    <span className="text-xs font-bold block">Variation 0{idx + 1}</span>
-                    <span className="text-[10px] opacity-80">{selectedSleeve} sleeve · {selectedCollar} collar</span>
+                <img
+                  src={img}
+                  alt="Generated couture look"
+                  className="w-full h-80 object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex flex-col justify-end p-4">
+                  <div className="text-white flex justify-between items-end">
+                    <div>
+                      <span className="text-xs font-bold block">Variation 0{idx + 1}</span>
+                      <span className="text-[10px] opacity-80">
+                        {selectedSleeve} sleeve · {selectedCollar} collar · {selectedFabric}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDownloadGeneratedImage(img, idx)
+                      }}
+                      className="p-1.5 bg-white/20 hover:bg-white text-white hover:text-black rounded-lg transition-all"
+                      title="Download image"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               </div>
