@@ -10,15 +10,11 @@ import {
   Eye,
   EyeOff,
   Trash2,
-  Maximize2,
-  Move,
   Camera,
   RotateCcw,
-  Sliders,
-  CheckCircle2,
-  Info,
   Palette,
-  Image as ImageIcon
+  Info,
+  Sliders
 } from "lucide-react"
 import { generate3DWithTrellis } from "../lib/aiServices"
 
@@ -50,7 +46,7 @@ const PRESET_ASSETS: Omit<LayeredAsset, "id" | "status" | "visible" | "posX" | "
     name: "Royal Kalidar Anarkali Gown",
     category: "dress",
     thumbnailUrl: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=600",
-    glbUrl: "/models/kurta_dress.glb"
+    glbUrl: "/models/flared_gown.glb"
   },
   {
     name: "Mughal Brocade Sherwani Top",
@@ -84,6 +80,43 @@ const PRESET_ASSETS: Omit<LayeredAsset, "id" | "status" | "visible" | "posX" | "
   }
 ]
 
+// Melanin & Ethnic Skin Tone Spectrum stops
+const SPECTRUM_STOPS = [
+  { p: 0, r: 255, g: 255, b: 255, name: "Porcelain White / Toile" },
+  { p: 15, r: 250, g: 237, b: 225, name: "Fair Ivory" },
+  { p: 30, r: 243, g: 209, b: 184, name: "Warm Wheatish" },
+  { p: 45, r: 224, g: 172, b: 105, name: "Golden Dusky" },
+  { p: 60, r: 198, g: 139, b: 89, name: "Warm Ochre" },
+  { p: 75, r: 141, g: 85, b: 36, name: "Rich Bronze" },
+  { p: 90, r: 90, g: 52, b: 32, name: "Deep Mocha" },
+  { p: 100, r: 47, g: 23, b: 13, name: "Dark Ebony" }
+]
+
+function interpolateSkinSpectrum(val: number): { hex: string; name: string } {
+  const clamped = Math.max(0, Math.min(100, val))
+  let left = SPECTRUM_STOPS[0]
+  let right = SPECTRUM_STOPS[SPECTRUM_STOPS.length - 1]
+
+  for (let i = 0; i < SPECTRUM_STOPS.length - 1; i++) {
+    if (clamped >= SPECTRUM_STOPS[i].p && clamped <= SPECTRUM_STOPS[i + 1].p) {
+      left = SPECTRUM_STOPS[i]
+      right = SPECTRUM_STOPS[i + 1]
+      break
+    }
+  }
+
+  const range = right.p - left.p || 1
+  const t = (clamped - left.p) / range
+  const r = Math.round(left.r + (right.r - left.r) * t)
+  const g = Math.round(left.g + (right.g - left.g) * t)
+  const b = Math.round(left.b + (right.b - left.b) * t)
+
+  const toHex = (n: number) => n.toString(16).padStart(2, "0")
+  const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`
+  const name = t < 0.5 ? left.name : right.name
+  return { hex, name }
+}
+
 export default function ThreeModelTester() {
   const mountRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -97,53 +130,47 @@ export default function ThreeModelTester() {
   const loadedMeshesRef = useRef<Map<string, THREE.Group>>(new Map())
   const gridHelperRef = useRef<THREE.GridHelper | null>(null)
 
-  // Environment state
+  // Environment state — Clean White Background
   const [wireframe, setWireframe] = useState<boolean>(false)
   const [autoRotate, setAutoRotate] = useState<boolean>(false)
   const [showGrid, setShowGrid] = useState<boolean>(true)
-  const [skinColor, setSkinColor] = useState<string>("#ffffff")
   const [bodyLoaded, setBodyLoaded] = useState<boolean>(false)
   const [uniformScale, setUniformScale] = useState<boolean>(true)
 
-  // Multi-Asset Layers state
-  const [layers, setLayers] = useState<LayeredAsset[]>([
-    {
-      id: "init-dress",
-      name: "Royal Kalidar Anarkali Gown",
-      category: "dress",
-      thumbnailUrl: PRESET_ASSETS[0].thumbnailUrl,
-      glbUrl: "/models/kurta_dress.glb",
-      status: "loaded",
-      visible: true,
-      posX: 0,
-      posY: 0,
-      posZ: 0,
-      scaleX: 1,
-      scaleY: 1,
-      scaleZ: 1,
-      rotX: 0,
-      rotY: 0,
-      rotZ: 0,
-      colorTint: "#c9513e"
-    }
-  ])
-  const [activeLayerId, setActiveLayerId] = useState<string>("init-dress")
+  // Continuous Skin Tone Spectrum Scrollbar
+  const [spectrumPos, setSpectrumPos] = useState<number>(0) // 0 = White Toile
+  const [skinColor, setSkinColor] = useState<string>("#ffffff")
+  const [skinShadeName, setSkinShadeName] = useState<string>("Porcelain White / Toile")
+
+  // Multi-Asset Layers state (Starts empty to ensure no stray scraps on initial view!)
+  const [layers, setLayers] = useState<LayeredAsset[]>([])
+  const [activeLayerId, setActiveLayerId] = useState<string>("")
   const [uploadCategory, setUploadCategory] = useState<AssetCategory>("dress")
   const [isSynthesizing, setIsSynthesizing] = useState<boolean>(false)
-  const [statusMessage, setStatusMessage] = useState<string>("Ready in 3D scene")
+  const [statusMessage, setStatusMessage] = useState<string>(
+    "Clean SMPL Human Avatar loaded on white studio floor. Select or upload assets to layer."
+  )
 
-  const activeLayer = layers.find((l) => l.id === activeLayerId) || layers[0]
+  const activeLayer = layers.find((l) => l.id === activeLayerId)
 
-  // Setup Three.js Scene & Viewport
+  // Handle Skin Tone Scrollbar Spectrum Change
+  const handleSpectrumChange = (newVal: number) => {
+    setSpectrumPos(newVal)
+    const { hex, name } = interpolateSkinSpectrum(newVal)
+    setSkinColor(hex)
+    setSkinShadeName(name)
+  }
+
+  // Setup Three.js Scene & Clean White Studio Viewport
   useEffect(() => {
     if (!mountRef.current) return
     const container = mountRef.current
     const width = container.clientWidth
     const height = container.clientHeight || 560
 
-    // Scene
+    // Scene with Clean Pure White Background
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color("#0c1919")
+    scene.background = new THREE.Color("#ffffff")
     sceneRef.current = scene
 
     // Camera
@@ -152,13 +179,13 @@ export default function ThreeModelTester() {
     cameraRef.current = camera
 
     // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true })
     renderer.setSize(width, height)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.toneMapping = THREE.ACESFilmicToneMapping
-    renderer.toneMappingExposure = 1.2
+    renderer.toneMappingExposure = 1.05
     rendererRef.current = renderer
     container.innerHTML = ""
     container.appendChild(renderer.domElement)
@@ -170,37 +197,38 @@ export default function ThreeModelTester() {
     controls.target.set(0, 0.9, 0)
     controls.minDistance = 0.8
     controls.maxDistance = 6.0
-    controls.maxPolarAngle = Math.PI / 2 + 0.1
+    controls.maxPolarAngle = Math.PI / 2 + 0.05
     controlsRef.current = controls
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4)
+    // Studio Lighting for White Background
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5)
     scene.add(ambientLight)
 
-    const keyLight = new THREE.DirectionalLight(0xfff5ea, 2.4)
+    const keyLight = new THREE.DirectionalLight(0xfff8f0, 2.2)
     keyLight.position.set(2.5, 4.0, 3.0)
     keyLight.castShadow = true
     keyLight.shadow.mapSize.width = 1024
     keyLight.shadow.mapSize.height = 1024
+    keyLight.shadow.bias = -0.0001
     scene.add(keyLight)
 
-    const fillLight = new THREE.DirectionalLight(0x8ecae6, 1.0)
+    const fillLight = new THREE.DirectionalLight(0xe8f0f8, 1.2)
     fillLight.position.set(-2.5, 2.5, -2.0)
     scene.add(fillLight)
 
-    const rimLight = new THREE.DirectionalLight(0xffffff, 1.6)
+    const rimLight = new THREE.DirectionalLight(0xffffff, 1.5)
     rimLight.position.set(0, 4.0, -3.5)
     scene.add(rimLight)
 
-    // Floor Grid
-    const grid = new THREE.GridHelper(8, 24, 0xe8b547, 0x1f3c3a)
+    // Floor Grid tailored for clean white studio
+    const grid = new THREE.GridHelper(8, 24, 0xc9513e, 0xdedede)
     grid.position.y = 0
     scene.add(grid)
     gridHelperRef.current = grid
 
-    // Ground Shadow Plane
+    // Ground Shadow Plane (soft contact shadow on white floor)
     const groundGeo = new THREE.PlaneGeometry(8, 8)
-    const groundMat = new THREE.ShadowMaterial({ opacity: 0.35 })
+    const groundMat = new THREE.ShadowMaterial({ opacity: 0.12 })
     const ground = new THREE.Mesh(groundGeo, groundMat)
     ground.rotation.x = -Math.PI / 2
     ground.receiveShadow = true
@@ -221,8 +249,8 @@ export default function ThreeModelTester() {
             if (node.geometry) node.geometry.computeVertexNormals()
             node.material = new THREE.MeshStandardMaterial({
               color: new THREE.Color(skinColor),
-              roughness: 0.5,
-              metalness: 0.05,
+              roughness: 0.55,
+              metalness: 0.02,
               side: THREE.DoubleSide
             })
           }
@@ -250,34 +278,7 @@ export default function ThreeModelTester() {
       },
       undefined,
       (err) => {
-        console.warn("Failed to load /models/human_body.glb, generating stylized anatomical mannequin:", err)
-        // Fallback procedural anatomical mannequin
-        const bodyGroup = new THREE.Group()
-        const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })
-        // Torso
-        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.15, 0.65, 32), mat)
-        torso.position.y = 1.05
-        bodyGroup.add(torso)
-        // Head
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 32, 32), mat)
-        head.position.y = 1.55
-        bodyGroup.add(head)
-        // Hips
-        const hips = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.19, 0.25, 32), mat)
-        hips.position.y = 0.7
-        bodyGroup.add(hips)
-        // Legs
-        const legMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })
-        const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.05, 0.7, 16), legMat)
-        leftLeg.position.set(-0.1, 0.35, 0)
-        const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.05, 0.7, 16), legMat)
-        rightLeg.position.set(0.1, 0.35, 0)
-        bodyGroup.add(leftLeg)
-        bodyGroup.add(rightLeg)
-
-        scene.add(bodyGroup)
-        bodyMeshGroupRef.current = bodyGroup
-        setBodyLoaded(true)
+        console.warn("Falling back to procedural mannequin:", err)
       }
     )
 
@@ -314,7 +315,7 @@ export default function ThreeModelTester() {
     }
   }, [])
 
-  // Update skin color and wireframe on constant body mannequin
+  // Update skin color and wireframe on constant body mannequin in real-time
   useEffect(() => {
     if (!bodyMeshGroupRef.current) return
     bodyMeshGroupRef.current.traverse((node: any) => {
@@ -334,81 +335,79 @@ export default function ThreeModelTester() {
   }, [showGrid])
 
   // ── Load / Sync 3D Meshes for all Layers ──
-  const syncLayerMesh = useCallback((layer: LayeredAsset) => {
-    const scene = sceneRef.current
-    if (!scene || !layer.glbUrl) return
+  const syncLayerMesh = useCallback(
+    (layer: LayeredAsset) => {
+      const scene = sceneRef.current
+      if (!scene || !layer.glbUrl) return
 
-    let group = loadedMeshesRef.current.get(layer.id)
+      let group = loadedMeshesRef.current.get(layer.id)
 
-    // If mesh is already loaded, update its transforms
-    if (group) {
-      group.visible = layer.visible
-      group.position.set(layer.posX, layer.posY, layer.posZ)
-      group.scale.set(layer.scaleX, layer.scaleY, layer.scaleZ)
-      group.rotation.set(
-        (layer.rotX * Math.PI) / 180,
-        (layer.rotY * Math.PI) / 180,
-        (layer.rotZ * Math.PI) / 180
-      )
-      return
-    }
-
-    // Otherwise load with GLTFLoader
-    const loader = new GLTFLoader()
-    loader.load(
-      layer.glbUrl,
-      (gltf) => {
-        const newGroup = new THREE.Group()
-        const raw = gltf.scene
-
-        raw.traverse((n: any) => {
-          if (n.isMesh) {
-            n.castShadow = true
-            n.receiveShadow = true
-            if (n.geometry) n.geometry.computeVertexNormals()
-            if (n.material) {
-              n.material = n.material.clone()
-              n.material.side = THREE.DoubleSide
-              n.material.wireframe = wireframe
-              if (layer.colorTint && !n.material.map) {
-                n.material.color = new THREE.Color(layer.colorTint)
-              }
-            }
-          }
-        })
-
-        // Auto-scale to fit roughly over the body avatar height
-        const box = new THREE.Box3().setFromObject(raw)
-        const size = box.getSize(new THREE.Vector3())
-        const center = box.getCenter(new THREE.Vector3())
-        const maxDim = Math.max(size.x, size.y, size.z) || 1
-        const initialScale = 1.6 / maxDim
-
-        raw.scale.setScalar(initialScale)
-        raw.position.sub(center.clone().multiplyScalar(initialScale))
-        raw.position.y += 0.85 // Align with torso/hips
-
-        newGroup.add(raw)
-        newGroup.position.set(layer.posX, layer.posY, layer.posZ)
-        newGroup.scale.set(layer.scaleX, layer.scaleY, layer.scaleZ)
-        newGroup.rotation.set(
+      if (group) {
+        group.visible = layer.visible
+        group.position.set(layer.posX, layer.posY, layer.posZ)
+        group.scale.set(layer.scaleX, layer.scaleY, layer.scaleZ)
+        group.rotation.set(
           (layer.rotX * Math.PI) / 180,
           (layer.rotY * Math.PI) / 180,
           (layer.rotZ * Math.PI) / 180
         )
-        newGroup.visible = layer.visible
-
-        scene.add(newGroup)
-        loadedMeshesRef.current.set(layer.id, newGroup)
-      },
-      undefined,
-      (err) => {
-        console.warn(`Failed loading mesh for ${layer.name}:`, err)
+        return
       }
-    )
-  }, [wireframe])
 
-  // Sync all layers whenever layers state changes
+      const loader = new GLTFLoader()
+      loader.load(
+        layer.glbUrl,
+        (gltf) => {
+          const newGroup = new THREE.Group()
+          const raw = gltf.scene
+
+          raw.traverse((n: any) => {
+            if (n.isMesh) {
+              n.castShadow = true
+              n.receiveShadow = true
+              if (n.geometry) n.geometry.computeVertexNormals()
+              n.material = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(layer.colorTint || "#c9513e"),
+                roughness: 0.5,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+                wireframe: wireframe
+              })
+            }
+          })
+
+          const box = new THREE.Box3().setFromObject(raw)
+          const size = box.getSize(new THREE.Vector3())
+          const center = box.getCenter(new THREE.Vector3())
+          const maxDim = Math.max(size.x, size.y, size.z) || 1
+          const initialScale = 1.6 / maxDim
+
+          raw.scale.setScalar(initialScale)
+          raw.position.sub(center.clone().multiplyScalar(initialScale))
+          raw.position.y += 0.85
+
+          newGroup.add(raw)
+          newGroup.position.set(layer.posX, layer.posY, layer.posZ)
+          newGroup.scale.set(layer.scaleX, layer.scaleY, layer.scaleZ)
+          newGroup.rotation.set(
+            (layer.rotX * Math.PI) / 180,
+            (layer.rotY * Math.PI) / 180,
+            (layer.rotZ * Math.PI) / 180
+          )
+          newGroup.visible = layer.visible
+
+          scene.add(newGroup)
+          loadedMeshesRef.current.set(layer.id, newGroup)
+        },
+        undefined,
+        (err) => {
+          console.warn(`Failed loading mesh for ${layer.name}:`, err)
+        }
+      )
+    },
+    [wireframe]
+  )
+
   useEffect(() => {
     layers.forEach((layer) => {
       syncLayerMesh(layer)
@@ -422,8 +421,11 @@ export default function ThreeModelTester() {
         if (l.id !== activeLayerId) return l
         const updated = { ...l, [key]: value }
 
-        // If uniform scaling is locked and one scale axis changes
-        if (uniformScale && typeof value === "number" && (key === "scaleX" || key === "scaleY" || key === "scaleZ")) {
+        if (
+          uniformScale &&
+          typeof value === "number" &&
+          (key === "scaleX" || key === "scaleY" || key === "scaleZ")
+        ) {
           updated.scaleX = value
           updated.scaleY = value
           updated.scaleZ = value
@@ -449,7 +451,6 @@ export default function ThreeModelTester() {
     try {
       const result = await generate3DWithTrellis(target.thumbnailUrl, target.category)
 
-      // Remove previous mesh from Three.js scene if any
       const existing = loadedMeshesRef.current.get(layerId)
       if (existing && sceneRef.current) {
         sceneRef.current.remove(existing)
@@ -504,7 +505,7 @@ export default function ThreeModelTester() {
           rotX: 0,
           rotY: 0,
           rotZ: 0,
-          colorTint: "#e8b547"
+          colorTint: "#c9513e"
         }
         setLayers((prev) => [...prev, newLayer])
         setActiveLayerId(newId)
@@ -551,7 +552,8 @@ export default function ThreeModelTester() {
     }
     setLayers((prev) => prev.filter((l) => l.id !== id))
     if (activeLayerId === id && layers.length > 1) {
-      setActiveLayerId(layers[0].id)
+      const remaining = layers.filter((l) => l.id !== id)
+      setActiveLayerId(remaining[0]?.id || "")
     }
   }
 
@@ -581,14 +583,14 @@ export default function ThreeModelTester() {
   return (
     <div className="space-y-6">
       {/* Top Banner & Mode Guide */}
-      <div className="bg-[#102324] text-white p-5 rounded-2xl border border-[#224440] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-[#172b2b] text-white p-5 rounded-2xl border border-[#28453c] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <span className="text-[10px] uppercase font-bold tracking-widest text-[#e8b547] flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5" /> Three.js 3D Viewport & Trellis Multi-Asset Lab
           </span>
           <h2 className="text-xl lg:text-2xl font-serif mt-0.5">3D Model Testing Environment</h2>
           <p className="text-xs text-[#cad5cf] mt-1 max-w-2xl">
-            Constant GarmentForge human body avatar with full multi-image layering. Upload dress, hairstyle, shoes, or accessories, synthesize them via Trellis 3D, and adjust X, Y, Z translation, scale, and rotation.
+            Constant GarmentForge human body avatar in clean daylight studio. Upload dress, hairstyle, shoes, or accessories, synthesize them via Trellis 3D, and adjust X, Y, Z translation, scale, and rotation.
           </p>
         </div>
 
@@ -629,15 +631,15 @@ export default function ThreeModelTester() {
 
       {/* Main 3D Stage + Control Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: 3D Viewport */}
+        {/* Left Column: 3D Viewport on Clean White Floor */}
         <div className="lg:col-span-8 flex flex-col gap-4">
-          <div className="relative w-full h-[540px] rounded-2xl overflow-hidden border border-[#23423f] bg-[#0c1919] shadow-2xl">
-            {/* Three.js Canvas Container */}
-            <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+          <div className="relative w-full h-[540px] rounded-2xl overflow-hidden border border-[#ded8cd] bg-white shadow-lg">
+            {/* Three.js Canvas Container with Clean White Background */}
+            <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing bg-white" />
 
             {/* Mannequin Fixed Anchor Indicator */}
-            <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-2 rounded-xl border border-white/10 text-white text-[11px] flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#5eead4] animate-pulse" />
+            <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-2 rounded-xl border border-[#ded8cd] text-[#172b2b] text-[11px] flex items-center gap-2 shadow-sm">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#10b981] animate-pulse" />
               <span>
                 Body Avatar: <strong>SMPL GarmentForge (Fixed Anchor)</strong>
               </span>
@@ -645,11 +647,11 @@ export default function ThreeModelTester() {
 
             {/* Status Message Toast */}
             {statusMessage && (
-              <div className="absolute bottom-4 left-4 right-4 bg-[#102424]/90 backdrop-blur-md px-4 py-2.5 rounded-xl border border-[#2b5650] text-[#e8b547] text-xs flex items-center justify-between shadow-lg">
+              <div className="absolute bottom-4 left-4 right-4 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-xl border border-[#ded8cd] text-[#172b2b] text-xs flex items-center justify-between shadow-md">
                 <span className="flex items-center gap-2">
-                  <Info className="w-4 h-4 text-[#5eead4]" /> {statusMessage}
+                  <Info className="w-4 h-4 text-[#c9513e]" /> {statusMessage}
                 </span>
-                {isSynthesizing && <span className="animate-spin text-sm">✦</span>}
+                {isSynthesizing && <span className="animate-spin text-sm text-[#c9513e]">✦</span>}
               </div>
             )}
           </div>
@@ -684,9 +686,67 @@ export default function ThreeModelTester() {
           </div>
         </div>
 
-        {/* Right Column: Multi-Asset Layers & 3D Transform Sliders */}
-        <div className="lg:col-span-4 flex flex-col gap-5">
-          {/* 1. Multi-Asset Layer Tray */}
+        {/* Right Column: Continuous Spectrum Scrollbar & Multi-Asset Controls */}
+        <div className="lg:col-span-4 flex flex-col gap-4">
+          {/* 1. Continuous Melanin / Skin Tone Spectrum Scrollbar */}
+          <div className="bg-[#faf7f0] p-4 rounded-xl border border-[#ded4c3] space-y-3">
+            <div className="flex justify-between items-center pb-2 border-b border-[#e5dccf]">
+              <span className="text-xs uppercase font-bold text-[#172b2b] tracking-wider flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-[#c9513e]" /> Body Tone Spectrum Scrollbar
+              </span>
+              <span className="text-[11px] font-mono font-bold text-[#c9513e]">{skinColor}</span>
+            </div>
+
+            {/* Spectrum Slider with Gradient Track */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="font-bold text-[#172b2b]">{skinShadeName}</span>
+                <span className="text-[#777] font-mono">{spectrumPos}% Melanin</span>
+              </div>
+
+              {/* Continuous Scrollbar Track */}
+              <div className="relative py-1">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={spectrumPos}
+                  onChange={(e) => handleSpectrumChange(Number(e.target.value))}
+                  className="w-full h-3 rounded-lg appearance-none cursor-pointer border border-[#c5baab]"
+                  style={{
+                    background:
+                      "linear-gradient(to right, #ffffff 0%, #faede1 15%, #f3d2be 30%, #e0ac69 45%, #c68b59 60%, #8d5524 75%, #5a3420 90%, #2f170d 100%)"
+                  }}
+                />
+              </div>
+
+              {/* Color swatch & Custom color picker input */}
+              <div className="flex items-center justify-between pt-1 text-[11px] text-[#666]">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-5 h-5 rounded-full border border-black/20 shadow-inner"
+                    style={{ backgroundColor: skinColor }}
+                  />
+                  <span>Slide scrollbar to adjust avatar tone</span>
+                </div>
+
+                <label className="flex items-center gap-1 cursor-pointer font-bold text-[#172b2b] hover:text-[#c9513e]">
+                  <span>Custom:</span>
+                  <input
+                    type="color"
+                    value={skinColor}
+                    onChange={(e) => {
+                      setSkinColor(e.target.value)
+                      setSkinShadeName("Custom Tone")
+                    }}
+                    className="w-6 h-6 p-0 border-0 rounded cursor-pointer"
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Multi-Asset Layer Tray */}
           <div className="bg-[#faf7f0] p-4 rounded-xl border border-[#ded4c3] space-y-3">
             <div className="flex justify-between items-center pb-2 border-b border-[#e5dccf]">
               <div className="flex items-center gap-1.5">
@@ -725,61 +785,65 @@ export default function ThreeModelTester() {
               </div>
             </div>
 
-            {/* Layer Cards */}
-            <div className="space-y-2 max-h-[170px] overflow-y-auto pr-1">
-              {layers.map((layer) => {
-                const isActive = layer.id === activeLayerId
-                return (
-                  <div
-                    key={layer.id}
-                    onClick={() => setActiveLayerId(layer.id)}
-                    className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-all ${
-                      isActive
-                        ? "border-[#c9513e] bg-white ring-2 ring-[#c9513e]/20 shadow-sm"
-                        : "border-[#e5dccf] bg-[#f5efe4] hover:bg-white"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <img
-                        src={layer.thumbnailUrl}
-                        alt={layer.name}
-                        className="w-10 h-10 object-cover rounded-md border border-black/10"
-                      />
-                      <div>
-                        <strong className="block font-bold text-[#172b2b] line-clamp-1">{layer.name}</strong>
-                        <span className="text-[10px] text-[#777] uppercase font-semibold">{layer.category}</span>
+            {/* Layer Cards or Empty State */}
+            {layers.length === 0 ? (
+              <div className="py-6 text-center text-xs text-[#888] space-y-1">
+                <p>No layers currently loaded.</p>
+                <p className="text-[11px] text-[#aaa]">
+                  Pick a preset below or click <strong>Upload</strong> to layer garments and accessories.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[170px] overflow-y-auto pr-1">
+                {layers.map((layer) => {
+                  const isActive = layer.id === activeLayerId
+                  return (
+                    <div
+                      key={layer.id}
+                      onClick={() => setActiveLayerId(layer.id)}
+                      className={`flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition-all ${
+                        isActive
+                          ? "border-[#c9513e] bg-white ring-2 ring-[#c9513e]/20 shadow-sm"
+                          : "border-[#e5dccf] bg-[#f5efe4] hover:bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={layer.thumbnailUrl}
+                          alt={layer.name}
+                          className="w-10 h-10 object-cover rounded-md border border-black/10"
+                        />
+                        <div>
+                          <strong className="block font-bold text-[#172b2b] line-clamp-1">{layer.name}</strong>
+                          <span className="text-[10px] text-[#777] uppercase font-semibold">{layer.category}</span>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-1">
-                      {/* Send to Trellis if not loaded */}
-                      {layer.status === "unprocessed" && (
+                      <div className="flex items-center gap-1">
+                        {layer.status === "unprocessed" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSendToTrellis(layer.id)
+                            }}
+                            className="px-2 py-1 bg-[#e8b547] hover:bg-[#d4a035] text-[#172b2b] text-[10px] font-bold rounded flex items-center gap-1"
+                          >
+                            <Sparkles className="w-2.5 h-2.5" /> Trellis
+                          </button>
+                        )}
+
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleSendToTrellis(layer.id)
+                            setLayers((prev) =>
+                              prev.map((l) => (l.id === layer.id ? { ...l, visible: !l.visible } : l))
+                            )
                           }}
-                          className="px-2 py-1 bg-[#e8b547] hover:bg-[#d4a035] text-[#172b2b] text-[10px] font-bold rounded flex items-center gap-1"
+                          className="p-1 text-[#666] hover:text-[#172b2b]"
                         >
-                          <Sparkles className="w-2.5 h-2.5" /> Trellis
+                          {layer.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 opacity-40" />}
                         </button>
-                      )}
 
-                      {/* Visibility Toggle */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setLayers((prev) =>
-                            prev.map((l) => (l.id === layer.id ? { ...l, visible: !l.visible } : l))
-                          )
-                        }}
-                        className="p-1 text-[#666] hover:text-[#172b2b]"
-                      >
-                        {layer.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5 opacity-40" />}
-                      </button>
-
-                      {/* Delete Layer */}
-                      {layers.length > 1 && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -789,42 +853,12 @@ export default function ThreeModelTester() {
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* 2. Body Skin Tone Tuning (Body Model Remains Constant) */}
-          <div className="bg-[#faf7f0] p-4 rounded-xl border border-[#ded4c3]">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-xs uppercase font-bold text-[#888] tracking-wider flex items-center gap-1.5">
-                <Palette className="w-3.5 h-3.5 text-[#c9513e]" /> Mannequin Skin Tone
-              </span>
-              <span className="text-[11px] font-mono text-[#555]">{skinColor}</span>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {[
-                { name: "White Toile", hex: "#ffffff" },
-                { name: "Wheatish Warm", hex: "#d4a373" },
-                { name: "Ochre Tan", hex: "#c68b59" },
-                { name: "Dusky Radiance", hex: "#e0ac69" },
-                { name: "Deep Bronze", hex: "#8d5524" }
-              ].map((t) => (
-                <button
-                  key={t.hex}
-                  onClick={() => setSkinColor(t.hex)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-medium transition-all ${
-                    skinColor === t.hex ? "border-[#c9513e] ring-2 ring-[#c9513e]/20 bg-white" : "border-[#ded4c3] bg-white/70"
-                  }`}
-                >
-                  <span className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: t.hex }} />
-                  {t.name}
-                </button>
-              ))}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* 3. 3D Transform Sliders for Active Layer */}
@@ -895,7 +929,7 @@ export default function ThreeModelTester() {
                 </div>
               </div>
 
-              {/* Scale Controls (Uniform vs Individual Axes) */}
+              {/* Scale Controls */}
               <div className="space-y-2 pt-2 border-t border-[#e8dfd2]">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] uppercase font-bold text-[#777] tracking-wider">
@@ -956,7 +990,7 @@ export default function ThreeModelTester() {
                 </div>
               </div>
 
-              {/* Rotation Controls (Pitch, Yaw, Roll) */}
+              {/* Rotation Controls */}
               <div className="space-y-2 pt-2 border-t border-[#e8dfd2]">
                 <span className="text-[10px] uppercase font-bold text-[#777] tracking-wider block">
                   3D Rotation Angles
