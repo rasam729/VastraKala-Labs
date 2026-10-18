@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 68" width="280" height="68" role="img" aria-label="VastraKala Labs">
+  <title>VastraKala Labs</title>
+
+  <!-- Diamond-V mark -->
+  <g transform="translate(34,34)">
+    <!-- Outer diamond -->
+    <polygon points="0,-31 24,0 0,31 -24,0"
+      fill="none" stroke="#C2410C" stroke-width="1.8"/>
+    <!-- Side tick marks -->
+    <line x1="-28" y1="-2" x2="-24" y2="-2" stroke="#C2410C" stroke-width="1.1"/>
+    <line x1="-28" y1="2"  x2="-24" y2="2"  stroke="#C2410C" stroke-width="1.1"/>
+    <line x1="28"  y1="-2" x2="24"  y2="-2" stroke="#C2410C" stroke-width="1.1"/>
+    <line x1="28"  y1="2"  x2="24"  y2="2"  stroke="#C2410C" stroke-width="1.1"/>
+    <!-- V shape -->
+    <path d="M-13,-14 L0,16 L13,-14"
+      fill="none" stroke="#C2410C" stroke-width="2.2"
+      stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Decorative knot at top of V -->
+    <path d="M-4,-16 C-4,-22 4,-22 4,-16 C4,-10 -4,-10 -4,-16"
+      fill="none" stroke="#C2410C" stroke-width="1.3"/>
+  </g>
+
+  <!-- "VastraKala" — serif, orange -->
+  <text x="72" y="28"
+    font-family="'Georgia', 'Times New Roman', serif"
+    font-size="22" font-weight="400"
+    fill="#C2410C" letter-spacing="-0.2">VastraKala</text>
+
+  <!-- "Labs" — sans-serif, bold, dark -->
+  <text x="204" y="28"
+    font-family="'Arial', 'Helvetica Neue', sans-serif"
+    font-size="22" font-weight="700"
+    fill="#1C1C1C">Labs</text>
+
+  <!-- Divider rule -->
+  <line x1="72" y1="36" x2="258" y2="36" stroke="#C2410C" stroke-width="0.6"/>
+
+  <!-- Tagline -->
+  <text x="165" y="50"
+    font-family="'Arial', 'Helvetica Neue', sans-serif"
+    font-size="6.5" font-weight="600"
+    fill="#999999" letter-spacing="1.4"
+    text-anchor="middle">FASHION DESIGN LEARNING PLATFORM</text>
+</svg>

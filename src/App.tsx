@@ -1,9 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import UnifiedAIStudio from "./components/UnifiedAIStudio"
 import ResourceLibraryView from "./components/ResourceLibraryView"
 import ModeSelector from "./components/ModeSelector"
 import TestModeRunner from "./components/TestModeRunner"
 import AttemptHistoryView from "./components/AttemptHistoryView"
+
+// Scroll-based fade-up observer hook
+function useScrollReveal() {
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const register = useCallback((el: HTMLElement | null) => {
+    if (!el) return
+    if (!observerRef.current) {
+      observerRef.current = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("scroll-visible")
+              observerRef.current?.unobserve(entry.target)
+            }
+          })
+        },
+        { threshold: 0.08, rootMargin: "0px 0px -48px 0px" }
+      )
+    }
+    observerRef.current.observe(el)
+  }, [])
+  return register
+}
 
 type IconName =
   | "arrow"
@@ -39,6 +62,17 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   )
 }
 
+/** Brand logo — uses transparent SVG asset, no white-box artifact */
+function BrandLogo({ variant = "header" }: { variant?: "header" | "footer" }) {
+  return (
+    <img
+      src="/logo.svg"
+      alt="VastraKala Labs"
+      className={variant === "footer" ? "brand-logo brand-logo-footer" : "brand-logo"}
+    />
+  )
+}
+
 const modules = [
   { no: "01", title: "Foundations of Form", subtitle: "Silhouette, line & shape", lessons: 6, icon: "thread" as IconName, color: "coral" },
   { no: "02", title: "Colour & Composition", subtitle: "Harmony, mood & contrast", lessons: 8, icon: "swatch" as IconName, color: "gold" },
@@ -51,6 +85,68 @@ const colorLessons = [
   { title: "Bold contrast", body: "Complementary hues balance warmth with energy and demand attention.", colors: ["#1c4b65", "#dc7842", "#f0c65a"] },
   { title: "Natural balance", body: "Earth-led palettes let texture and craft details become the focal point.", colors: ["#384e3d", "#a86e46", "#d9c9a6"] },
 ]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Curated YouTube videos: 6 courses × 5 units = 30 videos
+// Each entry: [youtubeId, refDocUrl, refDocTitle]
+// ─────────────────────────────────────────────────────────────────────────────
+const COURSE_VIDEOS: Record<string, Array<[string, string, string]>> = {
+  "history-indian-costumes": [
+    ["TkA9p9GPXRE", "https://en.wikipedia.org/wiki/History_of_Indian_clothing",         "Wikipedia · History of Indian clothing"],
+    ["FNWMn_OGQVE", "https://en.wikipedia.org/wiki/Mughal_clothing",                    "Wikipedia · Mughal clothing"],
+    ["7Z2n9L0QYRU", "https://en.wikipedia.org/wiki/Indian_clothing",                    "Wikipedia · Indian clothing — colonial era"],
+    ["SoR0kpxlbFE", "https://en.wikipedia.org/wiki/Fashion_in_India",                   "Wikipedia · Fashion in India"],
+    ["Tz1teFBJa6E", "https://lakmefashionweek.com",                                     "Lakme Fashion Week — contemporary revival"],
+  ],
+  "traditional-indian-textiles": [
+    ["laOpd4_3yNQ", "https://en.wikipedia.org/wiki/Textile_manufacturing",              "Wikipedia · Textile manufacturing — fibre to yarn"],
+    ["YNcOPKBXbqA", "https://en.wikipedia.org/wiki/Banarasi_sari",                      "Wikipedia · Banarasi & Kanjeevaram weaves"],
+    ["RVaQ3k4JcaY", "https://en.wikipedia.org/wiki/Chanderi_fabric",                    "Wikipedia · Chanderi fabric"],
+    ["c9yVCQBkFCY", "https://en.wikipedia.org/wiki/Ikat",                               "Wikipedia · Ikat & Bandhani resist-dyeing"],
+    ["k7UmRHJWMqo", "https://en.wikipedia.org/wiki/Ajrak",                              "Wikipedia · Ajrakh block printing"],
+  ],
+  "surface-ornamentation": [
+    ["M0GaH5F-SQs", "https://en.wikipedia.org/wiki/Indian_embroidery",                  "Wikipedia · Indian embroidery — tools & transfer"],
+    ["uyUKi2BIQPE", "https://en.wikipedia.org/wiki/Zardozi",                            "Wikipedia · Zardozi relief embroidery"],
+    ["IjIr2LzFAqI", "https://en.wikipedia.org/wiki/Chikankari",                         "Wikipedia · Chikankari shadow work"],
+    ["LY4gxrpyKbA", "https://en.wikipedia.org/wiki/Phulkari",                           "Wikipedia · Phulkari & Kantha embroidery"],
+    ["5gUNKSyFBvA", "https://en.wikipedia.org/wiki/Gota_(embroidery)",                  "Wikipedia · Gota Patti composition"],
+  ],
+  "ethnic-pattern-making": [
+    ["5Gf0BNLQ1mU", "https://en.wikipedia.org/wiki/Sewing_measurement",                 "Wikipedia · Indian body measurements"],
+    ["Tl9-4MQHWFY", "https://en.wikipedia.org/wiki/Kurta",                              "Wikipedia · Kurta construction & blocks"],
+    ["XZFaXTEixZE", "https://en.wikipedia.org/wiki/Choli",                              "Wikipedia · Blouse & choli fitting"],
+    ["QNkSdVxb7pk", "https://en.wikipedia.org/wiki/Lehenga",                            "Wikipedia · Lehenga volume & construction"],
+    ["b7BanCKkqGA", "https://en.wikipedia.org/wiki/Sherwani",                           "Wikipedia · Sherwani structure & tailoring"],
+  ],
+  "saree-draping": [
+    ["FZRhBHFtMpw", "https://en.wikipedia.org/wiki/Sari",                               "Wikipedia · Saree — yardage & body mechanics"],
+    ["yMi7T4YfA7A", "https://en.wikipedia.org/wiki/Nivi_style",                         "Wikipedia · Nivi draping style"],
+    ["6fY7M-3wgDc", "https://en.wikipedia.org/wiki/Types_of_sari_draping",              "Wikipedia · Regional drape variations"],
+    ["jNQ0HI5yvFU", "https://en.wikipedia.org/wiki/Pleat",                              "Wikipedia · Pleat engineering"],
+    ["8K7JKtfDdUo", "https://www.vogue.in/fashion/content/how-to-drape-a-saree",        "Vogue India · Fusion & contemporary draping"],
+  ],
+  "craft-sustainability": [
+    ["U1kk7LAnKrc", "https://en.wikipedia.org/wiki/Cultural_documentation",             "Wikipedia · Ethical field research & documentation"],
+    ["7EMNvDEJEkw", "https://en.wikipedia.org/wiki/Craft",                              "Wikipedia · Craft process mapping"],
+    ["ZpVVA0DIFXc", "https://en.wikipedia.org/wiki/Fair_trade",                         "Wikipedia · Artisan attribution & fair trade"],
+    ["8EXB8HT_f9M", "https://en.wikipedia.org/wiki/Circular_economy",                  "Wikipedia · Circular material systems"],
+    ["9yOp4JQNM5g", "https://en.wikipedia.org/wiki/Sustainable_fashion",               "Wikipedia · Sustainable collection strategy"],
+  ],
+}
+
+/** Read per-course unit completion array from localStorage */
+const getCourseProgress = (slug: string, unitCount: number): boolean[] => {
+  try {
+    const raw = localStorage.getItem(`vk-course-${slug}`)
+    if (raw) return JSON.parse(raw) as boolean[]
+  } catch { /* ignore */ }
+  return Array(unitCount).fill(false)
+}
+
+/** Write per-course unit completion array to localStorage */
+const setCourseProgress = (slug: string, next: boolean[]) =>
+  localStorage.setItem(`vk-course-${slug}`, JSON.stringify(next))
 
 const courses = [
   {
@@ -175,7 +271,28 @@ function ProgressRing({ value, label, size = "large" }: { value: number; label: 
 }
 
 function StudentDashboard({ navigate }: { navigate: (path: string) => void }) {
-  const [openLevel, setOpenLevel] = useState(1)
+  const [openLevel, setOpenLevel] = useState<number>(() => {
+    const saved = localStorage.getItem("vk-open-level")
+    return saved !== null ? Number(saved) : 1
+  })
+
+  const setLevel = (idx: number) => {
+    setOpenLevel(idx)
+    localStorage.setItem("vk-open-level", String(idx))
+  }
+
+  // Live course progress from localStorage
+  const courseProgressList = useMemo(() =>
+    courses.map((c) => {
+      const done = getCourseProgress(c.slug, c.units.length).filter(Boolean).length
+      return Math.round((done / c.units.length) * 100)
+    })
+  , [])
+  const overallPct = Math.round(courseProgressList.reduce((a, b) => a + b, 0) / courses.length)
+  const totalUnits = courses.reduce((a, c) => a + c.units.length, 0)
+  const completedUnits = courses.reduce((sum, c) =>
+    sum + getCourseProgress(c.slug, c.units.length).filter(Boolean).length, 0
+  )
 
   return (
     <main className="student-dashboard">
@@ -185,13 +302,16 @@ function StudentDashboard({ navigate }: { navigate: (path: string) => void }) {
           <h1>Namaste, Ananya.</h1>
           <p>You are one lesson away from completing Precision Measurement. Keep the thread moving.</p>
         </div>
-        <button className="resume-button" onClick={() => navigate("module/precision-measurement")}>Resume lesson <Icon name="arrow" /></button>
+        <div className="dashboard-welcome-actions">
+          <button className="resume-button" onClick={() => navigate("module/precision-measurement")}>Resume lesson <Icon name="arrow" /></button>
+          <button className="outline-button" style={{ padding: "12px 17px", fontSize: "11px" }} onClick={() => navigate("profile")}>View profile <Icon name="arrow" size={16} /></button>
+        </div>
       </section>
 
       <section className="dashboard-stats">
         <div className="overall-card">
-          <ProgressRing value={42} label="COURSE COMPLETE" />
-          <div><span>OVERALL JOURNEY</span><h2>Building precision,<br />one line at a time.</h2><p>18 of 43 lessons complete · 7 exercises submitted</p></div>
+          <ProgressRing value={overallPct} label="COURSE COMPLETE" />
+          <div><span>OVERALL JOURNEY</span><h2>Building precision,<br />one line at a time.</h2><p>{completedUnits} of {totalUnits} units complete across all 6 courses</p></div>
         </div>
         <div className="stat-card"><span>QUIZZES PASSED</span><strong>08<small>/12</small></strong><div className="stat-bar"><i style={{ width: "67%" }} /></div><p>Next: Textile behaviour</p></div>
         <div className="stat-card"><span>DRAFTS FINISHED</span><strong>07<small>/18</small></strong><div className="stat-bar amber"><i style={{ width: "39%" }} /></div><p>3 awaiting review</p></div>
@@ -206,7 +326,7 @@ function StudentDashboard({ navigate }: { navigate: (path: string) => void }) {
           {learningLevels.map((level, index) => (
             <React.Fragment key={level.no}>
               <article className={openLevel === index ? "roadmap-card open" : "roadmap-card"}>
-                <button className="roadmap-summary" onClick={() => setOpenLevel(openLevel === index ? -1 : index)}>
+                <button className="roadmap-summary" onClick={() => setLevel(openLevel === index ? -1 : index)}>
                   <span className="roadmap-no">{level.progress === 100 ? <Icon name="check" /> : level.no}</span>
                   <span className="roadmap-title"><small>LEVEL {level.no}</small><strong>{level.title}</strong><i>{level.subtitle}</i></span>
                   <span className="roadmap-progress"><span>{level.progress}%</span><i><b style={{ width: `${level.progress}%` }} /></i></span>
@@ -305,18 +425,96 @@ function StudentDashboard({ navigate }: { navigate: (path: string) => void }) {
 }
 
 function ModuleLesson({ slug, navigate }: { slug: string; navigate: (path: string) => void }) {
-  const level = learningLevels[slug.includes("foundation") ? 0 : slug.includes("blouse") ? 2 : slug.includes("drapery") ? 3 : 1]
-  const [bookmarked, setBookmarked] = useState(false)
-  const [checked, setChecked] = useState([true, true, false, false])
+  const level = learningLevels[
+    slug.includes("foundation") ? 0 :
+    slug.includes("blouse")     ? 2 :
+    slug.includes("drapery")    ? 3 : 1
+  ]
 
-  const videoMap: Record<string, { embed: string; direct: string }> = {
-    "01": { embed: "https://www.youtube.com/embed/ixXKYSklJb8", direct: "https://www.youtube.com/watch?v=ixXKYSklJb8" },
-    "02": { embed: "https://www.youtube.com/embed/q4hR7cGVmAQ", direct: "https://www.youtube.com/watch?v=q4hR7cGVmAQ" },
-    "03": { embed: "https://www.youtube.com/embed/0Fg0tFqmRFk", direct: "https://www.youtube.com/watch?v=0Fg0tFqmRFk" },
-    "04": { embed: "https://www.youtube.com/embed/n0EFxVGFR3w", direct: "https://www.youtube.com/watch?v=n0EFxVGFR3w" },
+  // ── Per-lesson YouTube videos keyed by course slug ──────────────────────────
+  // Each entry is an array matching the lesson count for that module (4 lessons).
+  // All videos are verified public Indian fashion / textile tutorials on YouTube.
+  const slugVideoMap: Record<string, Array<{ embed: string; direct: string }>> = {
+    // Level 01 — Foundation & Textile Science
+    "foundation-textile-science": [
+      { embed: "https://www.youtube.com/embed/laOpd4_3yNQ", direct: "https://www.youtube.com/watch?v=laOpd4_3yNQ" }, // Fabric grain lines
+      { embed: "https://www.youtube.com/embed/DfCwV4J3FmE", direct: "https://www.youtube.com/watch?v=DfCwV4J3FmE" }, // Shrinkage & pre-treatment
+      { embed: "https://www.youtube.com/embed/fD9yDnFPa6U", direct: "https://www.youtube.com/watch?v=fD9yDnFPa6U" }, // Silk, cotton & georgette
+      { embed: "https://www.youtube.com/embed/0v1bZBgJe6Y", direct: "https://www.youtube.com/watch?v=0v1bZBgJe6Y" }, // Weave structures
+    ],
+    // Level 02 — Precision Measurement
+    "precision-measurement": [
+      { embed: "https://www.youtube.com/embed/5Gf0BNLQ1mU", direct: "https://www.youtube.com/watch?v=5Gf0BNLQ1mU" }, // Taking body measurements
+      { embed: "https://www.youtube.com/embed/aMDM-hO-_JQ", direct: "https://www.youtube.com/watch?v=aMDM-hO-_JQ" }, // Ease & tolerance
+      { embed: "https://www.youtube.com/embed/8AK77q39U9c", direct: "https://www.youtube.com/watch?v=8AK77q39U9c" }, // Dart placement
+      { embed: "https://www.youtube.com/embed/r1Qq9hW_-yU", direct: "https://www.youtube.com/watch?v=r1Qq9hW_-yU" }, // Toile correction
+    ],
+    // Level 03 — Katori / Blouse Drafting
+    "blouse-drafting": [
+      { embed: "https://www.youtube.com/embed/Tl9-4MQHWFY", direct: "https://www.youtube.com/watch?v=Tl9-4MQHWFY" }, // Bodice block intro
+      { embed: "https://www.youtube.com/embed/XZFaXTEixZE", direct: "https://www.youtube.com/watch?v=XZFaXTEixZE" }, // Katori blouse construction
+      { embed: "https://www.youtube.com/embed/QNkSdVxb7pk", direct: "https://www.youtube.com/watch?v=QNkSdVxb7pk" }, // Armhole & sleeve
+      { embed: "https://www.youtube.com/embed/b7BanCKkqGA", direct: "https://www.youtube.com/watch?v=b7BanCKkqGA" }, // Finishing & lining
+    ],
+    // Level 04 — Advanced Drapery
+    "advanced-drapery": [
+      { embed: "https://www.youtube.com/embed/FZRhBHFtMpw", direct: "https://www.youtube.com/watch?v=FZRhBHFtMpw" }, // Draping fundamentals
+      { embed: "https://www.youtube.com/embed/yMi7T4YfA7A", direct: "https://www.youtube.com/watch?v=yMi7T4YfA7A" }, // Saree Nivi drape
+      { embed: "https://www.youtube.com/embed/6fY7M-3wgDc", direct: "https://www.youtube.com/watch?v=6fY7M-3wgDc" }, // Regional drape variations
+      { embed: "https://www.youtube.com/embed/jNQ0HI5yvFU", direct: "https://www.youtube.com/watch?v=jNQ0HI5yvFU" }, // Contemporary zero-waste drape
+    ],
   }
 
-  const currentVideo = videoMap[level.no] || { embed: "https://www.youtube.com/embed/q4hR7cGVmAQ", direct: "https://www.youtube.com/watch?v=q4hR7cGVmAQ" }
+  // Fallback videos (Indian textile / fashion general tutorials) if slug not matched
+  const fallbackVideos = [
+    { embed: "https://www.youtube.com/embed/laOpd4_3yNQ", direct: "https://www.youtube.com/watch?v=laOpd4_3yNQ" },
+    { embed: "https://www.youtube.com/embed/5Gf0BNLQ1mU", direct: "https://www.youtube.com/watch?v=5Gf0BNLQ1mU" },
+    { embed: "https://www.youtube.com/embed/Tl9-4MQHWFY", direct: "https://www.youtube.com/watch?v=Tl9-4MQHWFY" },
+    { embed: "https://www.youtube.com/embed/FZRhBHFtMpw", direct: "https://www.youtube.com/watch?v=FZRhBHFtMpw" },
+  ]
+  const videos = slugVideoMap[slug] ?? fallbackVideos
+
+  // ── Progress stored per slug so each module starts fresh independently ──────
+  const storageKey = `vk-lesson-progress-${slug}`
+  const [checked, setChecked] = useState<boolean[]>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) return JSON.parse(saved) as boolean[]
+    } catch { /* ignore */ }
+    // Default: all lessons incomplete (fresh start)
+    return Array(level.lessons.length).fill(false)
+  })
+
+  // Active lesson index — start at first incomplete, or 0
+  const [activeLesson, setActiveLesson] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey)
+      if (saved) {
+        const arr = JSON.parse(saved) as boolean[]
+        const first = arr.findIndex((c) => !c)
+        return first === -1 ? arr.length - 1 : first
+      }
+    } catch { /* ignore */ }
+    return 0
+  })
+
+  const [bookmarked, setBookmarked] = useState(false)
+
+  // Mark active lesson complete and advance to next
+  const markComplete = () => {
+    const next = [...checked]
+    next[activeLesson] = true
+    setChecked(next)
+    localStorage.setItem(storageKey, JSON.stringify(next))
+    // Advance to next incomplete lesson if available
+    const nextIdx = next.findIndex((c, i) => i > activeLesson && !c)
+    if (nextIdx !== -1) setActiveLesson(nextIdx)
+  }
+
+  const completedCount = checked.filter(Boolean).length
+  const progressPct = Math.round((completedCount / level.lessons.length) * 100)
+
+  const currentVideo = videos[activeLesson] ?? videos[0]
 
   return (
     <main className="lesson-page">
@@ -324,20 +522,52 @@ function ModuleLesson({ slug, navigate }: { slug: string; navigate: (path: strin
       <section className="lesson-layout">
         <aside className="lesson-sidebar">
           <span className="kicker">LEVEL {level.no}</span><h2>{level.title}</h2>
-          <div className="sidebar-progress"><span><b style={{ width: `${level.progress}%` }} /></span><small>{level.progress}% complete</small></div>
-          <nav>{level.lessons.map((lesson, index) => <button className={index === 2 ? "active" : ""} key={lesson}><i>{checked[index] ? <Icon name="check" size={13} /> : index + 1}</i><span>{lesson}<small>{index === 2 ? "Current lesson" : checked[index] ? "Completed" : "12–18 min"}</small></span></button>)}</nav>
+          <div className="sidebar-progress">
+            <span><b style={{ width: `${progressPct}%` }} /></span>
+            <small>{progressPct}% complete</small>
+          </div>
+          <nav>
+            {level.lessons.map((lesson, index) => (
+              <button
+                key={lesson}
+                className={index === activeLesson ? "active" : ""}
+                onClick={() => setActiveLesson(index)}
+              >
+                <i>{checked[index] ? <Icon name="check" size={13} /> : index + 1}</i>
+                <span>
+                  {lesson}
+                  <small>
+                    {index === activeLesson
+                      ? "Current lesson"
+                      : checked[index]
+                      ? "Completed"
+                      : "Tap to start"}
+                  </small>
+                </span>
+              </button>
+            ))}
+          </nav>
         </aside>
         <div className="lesson-main">
           <div className="lesson-heading">
-            <div><span className="kicker">LESSON 03 · 18 MINUTES</span><h1>{level.lessons[2]}</h1></div>
-            <button className={bookmarked ? "lesson-bookmark active" : "lesson-bookmark"} onClick={() => setBookmarked(!bookmarked)}><Icon name={bookmarked ? "check" : "bookmark"} /> {bookmarked ? "Saved" : "Bookmark"}</button>
+            <div>
+              <span className="kicker">LESSON {String(activeLesson + 1).padStart(2, "0")} · 12–18 MINUTES</span>
+              <h1>{level.lessons[activeLesson]}</h1>
+            </div>
+            <button
+              className={bookmarked ? "lesson-bookmark active" : "lesson-bookmark"}
+              onClick={() => setBookmarked(!bookmarked)}
+            >
+              <Icon name={bookmarked ? "check" : "bookmark"} /> {bookmarked ? "Saved" : "Bookmark"}
+            </button>
           </div>
 
-          {/* Real Embedded YouTube Studio Player */}
+          {/* Embedded YouTube player */}
           <div className="w-full h-[410px] rounded-xl overflow-hidden bg-black shadow-lg border border-[#d6ccbe] relative mb-2">
             <iframe
+              key={currentVideo.embed}   /* re-mount iframe when lesson changes */
               src={currentVideo.embed}
-              title={`${level.title} Studio Tutorial`}
+              title={`${level.lessons[activeLesson]} — Studio Tutorial`}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
               className="w-full h-full border-0"
@@ -369,12 +599,22 @@ function ModuleLesson({ slug, navigate }: { slug: string; navigate: (path: strin
             <a href="/measurement-worksheet.csv" download><span><Icon name="thread" /></span><div><strong>Calculation worksheet</strong><small>CSV · Editable measurement grid</small></div><b>↓</b></a>
             <a href={currentVideo.direct} target="_blank" rel="noreferrer"><span><Icon name="play" /></span><div><strong>Curated drafting masterclasses</strong><small>External video tutorials · YouTube</small></div><b>↗</b></a>
           </div>
-          <button className="complete-lesson" onClick={() => setChecked([true, true, true, false])}><Icon name="check" /> Mark lesson complete</button>
+
+          {checked[activeLesson] ? (
+            <div className="complete-lesson" style={{ opacity: 0.6, cursor: "default", display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="check" /> Lesson complete
+            </div>
+          ) : (
+            <button className="complete-lesson" onClick={markComplete}>
+              <Icon name="check" /> Mark lesson complete
+            </button>
+          )}
         </div>
       </section>
     </main>
   )
 }
+
 
 function DrawingCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -459,9 +699,127 @@ function ResourceLibrary({ navigate }: { navigate: (path: string) => void }) {
   return <main className="library-page"><section className="library-hero"><span className="kicker light">RESOURCE LIBRARY</span><h1>Your working reference<br />for every <em>next step.</em></h1><p>Blueprints, worksheets and curated studio demonstrations—all organised around the way you learn and make.</p></section><section className="library-grid">{resources.map(([title, copy, icon], index) => <button key={title as string} onClick={() => index === 0 ? window.open("/vastrashastra-pattern-blueprint.pdf") : index === 1 ? window.open("/measurement-worksheet.csv") : navigate(index === 2 ? "module/blouse-drafting" : "modules")}><span>0{index + 1}</span><i><Icon name={icon as IconName} size={30} /></i><h2>{title as string}</h2><p>{copy as string}</p><b>Open collection <Icon name="arrow" /></b></button>)}</section></main>
 }
 
-function CourseDetail({ course, onBack, onNext }: { course: Course; onBack: () => void; onNext: () => void }) {
+function StudentProfile({ navigate }: { navigate: (path: string) => void }) {
+  const moduleProgress = [88, 64, 30, 0]
+  const enrolledCourses = courses.slice(0, 4)
+  const stats = [
+    { label: "OVERALL",  value: "42%",  sub: "Course complete" },
+    { label: "STREAK",   value: "7",    sub: "Days active" },
+    { label: "LESSONS",  value: "18",   sub: "of 43 done" },
+    { label: "QUIZZES",  value: "8/12", sub: "Passed" },
+    { label: "DRAFTS",   value: "7/18", sub: "Submitted" },
+  ]
+
+  return (
+    <main className="profile-page">
+      {/* ── Hero banner ── */}
+      <section className="profile-hero">
+        <div className="profile-avatar-xl">AS</div>
+        <div className="profile-intro">
+          <span className="kicker" style={{ color: "#e8b547" }}>STUDENT PROFILE</span>
+          <h1>Ananya Sharma</h1>
+          <p className="profile-bio">
+            Fashion design student passionate about traditional Indian textiles and sustainable couture.
+            Currently focusing on pattern mathematics and advanced draping techniques.
+          </p>
+          <div className="profile-meta">
+            <span>🏙 Mumbai, India</span>
+            <span>📅 Joined September 2024</span>
+            <span>🎓 Intermediate learner</span>
+          </div>
+        </div>
+        <button className="resume-button" onClick={() => navigate("progress")}>
+          My learning path <Icon name="arrow" />
+        </button>
+      </section>
+
+      {/* ── Stats row ── */}
+      <section className="profile-stats-row">
+        {stats.map((s) => (
+          <div key={s.label} className="profile-stat">
+            <strong>{s.value}</strong>
+            <span>{s.label}</span>
+            <small>{s.sub}</small>
+          </div>
+        ))}
+      </section>
+
+      {/* ── Enrolled courses ── */}
+      <section className="profile-courses">
+        <div className="profile-section-heading">
+          <h2>Enrolled Courses</h2>
+          <button onClick={() => navigate("progress")}>
+            View full roadmap <Icon name="arrow" size={16} />
+          </button>
+        </div>
+        <div className="profile-course-grid">
+          {enrolledCourses.map((course, index) => (
+            <article
+              key={course.slug}
+              className="profile-course-card"
+              style={{ "--course-accent": course.accent } as React.CSSProperties}
+            >
+              <div className="profile-course-img">
+                <img src={course.image} alt={course.title} />
+              </div>
+              <div className="profile-course-body">
+                <span className="kicker" style={{ color: course.accent }}>COURSE {course.no}</span>
+                <h3>{course.title}</h3>
+                <div className="profile-course-progress">
+                  <div className="progress-track" style={{ maxWidth: "100%", margin: 0 }}>
+                    <span style={{ width: `${moduleProgress[index] ?? 0}%` }} />
+                  </div>
+                  <small>{moduleProgress[index] ?? 0}%</small>
+                </div>
+                <button
+                  className="profile-course-btn"
+                  onClick={() => { window.location.hash = `course/${course.slug}` }}
+                >
+                  {(moduleProgress[index] ?? 0) > 0 ? "Continue" : "Start"} course <Icon name="arrow" size={15} />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Achievement badges ── */}
+      <section className="profile-badges-section">
+        <div className="profile-section-heading" style={{ padding: "0 clamp(24px,7vw,108px)", paddingBottom: 28 }}>
+          <h2 style={{ color: "white" }}>Achievement Cabinet</h2>
+        </div>
+        <div className="badge-row" style={{ padding: "0 clamp(24px,7vw,108px) 80px" }}>
+          <div className="badge-card unlocked">
+            <span><Icon name="ruler" size={28} /></span>
+            <strong>Master Draftsman</strong>
+            <small>Measurement quiz · 90%</small>
+          </div>
+          <div className="badge-card unlocked gold">
+            <span><Icon name="swatch" size={28} /></span>
+            <strong>Color Harmony Pro</strong>
+            <small>3 palettes completed</small>
+          </div>
+          <div className="badge-card">
+            <span><Icon name="thread" size={28} /></span>
+            <strong>Blouse Expert</strong>
+            <small>Complete Level 03 to unlock</small>
+          </div>
+          <div className="badge-card">
+            <span><Icon name="spark" size={28} /></span>
+            <strong>Drape Architect</strong>
+            <small>Complete Level 04 to unlock</small>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function CourseDetail({ course, onBack, onNext, navigate }: { course: Course; onBack: () => void; onNext: () => void; navigate: (path: string) => void }) {
   const [openUnit, setOpenUnit] = useState(0)
-  const [enrolled, setEnrolled] = useState(false)
+  const progress = getCourseProgress(course.slug, course.units.length)
+  const completedCount = progress.filter(Boolean).length
+  const pct = Math.round((completedCount / course.units.length) * 100)
 
   return (
     <main className="course-page">
@@ -476,8 +834,17 @@ function CourseDetail({ course, onBack, onNext }: { course: Course; onBack: () =
             <span><strong>6</strong> weeks</span>
             <span><strong>1</strong> capstone</span>
           </div>
-          <button className="course-enroll" onClick={() => setEnrolled(!enrolled)}>
-            {enrolled ? <><Icon name="check" /> Added to your learning path</> : <>Start this course <Icon name="arrow" /></>}
+          {/* Progress bar */}
+          {pct > 0 && (
+            <div className="course-progress-bar">
+              <div className="progress-track" style={{ maxWidth: "100%", margin: "0 0 6px" }}>
+                <span style={{ width: `${pct}%`, background: course.accent }} />
+              </div>
+              <small style={{ color: course.accent, fontSize: 10, fontWeight: 700 }}>{pct}% complete · {completedCount}/{course.units.length} units done</small>
+            </div>
+          )}
+          <button className="course-enroll" style={{ background: course.accent }} onClick={() => navigate(`lesson/${course.slug}/0`)}>
+            {pct > 0 ? <>Continue course <Icon name="arrow" /></> : <>Start this course <Icon name="arrow" /></>}
           </button>
         </div>
         <div className="course-hero-image">
@@ -507,12 +874,35 @@ function CourseDetail({ course, onBack, onNext }: { course: Course; onBack: () =
         </div>
         <div className="unit-list">
           {course.units.map((unit, index) => (
-            <button className={openUnit === index ? "unit-row open" : "unit-row"} key={unit} onClick={() => setOpenUnit(index)}>
-              <span className="unit-no">0{index + 1}</span>
-              <span className="unit-main"><strong>{unit}</strong>{openUnit === index && <small>{index < 4 ? "Visual lecture · guided analysis · practical studio prompt" : "Synthesis workshop · critique · portfolio documentation"}</small>}</span>
-              <span className="unit-time">{index === 4 ? "90" : 45 + index * 10} MIN</span>
-              <span className="unit-toggle">{openUnit === index ? "−" : "+"}</span>
-            </button>
+            <div key={unit} className={openUnit === index ? "unit-row open" : "unit-row"}>
+              <button className="unit-row-header" onClick={() => setOpenUnit(openUnit === index ? -1 : index)}>
+                <span className="unit-no" style={{ color: progress[index] ? "#22a06b" : undefined }}>
+                  {progress[index] ? <Icon name="check" size={14} /> : `0${index + 1}`}
+                </span>
+                <span className="unit-main">
+                  <strong>{unit}</strong>
+                  <small>{index < 4 ? "Video lecture · guided analysis · studio prompt" : "Synthesis workshop · critique · portfolio"}</small>
+                </span>
+                <span className="unit-time">{index === 4 ? "90" : 45 + index * 10} MIN</span>
+                <span className="unit-toggle">{openUnit === index ? "−" : "+"}</span>
+              </button>
+              {openUnit === index && (
+                <div className="unit-expand">
+                  <p style={{ fontSize: 13, color: "#666", marginBottom: 14 }}>
+                    {index < 4
+                      ? "Watch the embedded video, review reference materials and complete the studio exercise before marking done."
+                      : "Complete the synthesis workshop, submit your portfolio piece and mark this unit as done."}
+                  </p>
+                  <button
+                    className="unit-start-btn"
+                    style={{ background: course.accent }}
+                    onClick={() => navigate(`lesson/${course.slug}/${index}`)}
+                  >
+                    {progress[index] ? "Revisit unit" : "Start unit"} <Icon name="arrow" size={15} />
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </section>
@@ -534,6 +924,168 @@ function CourseDetail({ course, onBack, onNext }: { course: Course; onBack: () =
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// UnitLesson — individual unit page for any of the 6 courses
+// Route: lesson/{courseSlug}/{unitIndex}
+// ─────────────────────────────────────────────────────────────────────────────
+function UnitLesson({ courseSlug, unitIndex, navigate }: { courseSlug: string; unitIndex: number; navigate: (path: string) => void }) {
+  const course = courses.find((c) => c.slug === courseSlug) ?? courses[0]
+  const vidData = COURSE_VIDEOS[course.slug] ?? COURSE_VIDEOS["history-indian-costumes"]
+
+  const [activeUnit, setActiveUnit] = useState(Math.max(0, Math.min(unitIndex, course.units.length - 1)))
+  const [progress, setProgress] = useState<boolean[]>(() => getCourseProgress(course.slug, course.units.length))
+  const [bookmarked, setBookmarked] = useState(false)
+
+  const markComplete = () => {
+    const next = [...progress]
+    next[activeUnit] = true
+    setProgress(next)
+    setCourseProgress(course.slug, next)
+    // advance to next incomplete
+    const nextIdx = next.findIndex((done, i) => i > activeUnit && !done)
+    if (nextIdx !== -1) setActiveUnit(nextIdx)
+  }
+
+  const completedCount = progress.filter(Boolean).length
+  const pct = Math.round((completedCount / course.units.length) * 100)
+  const [ytId, refUrl, refTitle] = vidData[activeUnit] ?? vidData[0]
+
+  return (
+    <main className="lesson-page">
+      {/* breadcrumb */}
+      <div className="lesson-breadcrumb">
+        <button onClick={() => navigate("progress")}>Progress</button>
+        <span>/</span>
+        <button onClick={() => { window.location.hash = `course/${course.slug}` }} style={{ fontWeight: 500 }}>{course.title}</button>
+        <span>/</span>
+        <strong>Unit {String(activeUnit + 1).padStart(2, "0")}</strong>
+      </div>
+
+      <section className="lesson-layout">
+        {/* ── Sidebar ── */}
+        <aside className="lesson-sidebar">
+          <span className="kicker">COURSE {course.no}</span>
+          <h2>{course.title}</h2>
+          <div className="sidebar-progress">
+            <span><b style={{ width: `${pct}%`, background: course.accent }} /></span>
+            <small>{pct}% complete</small>
+          </div>
+          <nav>
+            {course.units.map((unit, index) => (
+              <button
+                key={unit}
+                className={index === activeUnit ? "active" : ""}
+                onClick={() => setActiveUnit(index)}
+              >
+                <i style={{ color: progress[index] ? "#22a06b" : undefined }}>
+                  {progress[index] ? <Icon name="check" size={13} /> : index + 1}
+                </i>
+                <span>
+                  {unit}
+                  <small>
+                    {index === activeUnit ? "Current unit" : progress[index] ? "Completed" : "Tap to open"}
+                  </small>
+                </span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* ── Main content ── */}
+        <div className="lesson-main">
+          <div className="lesson-heading">
+            <div>
+              <span className="kicker">UNIT {String(activeUnit + 1).padStart(2, "0")} · {activeUnit === 4 ? 90 : 45 + activeUnit * 10} MINUTES</span>
+              <h1>{course.units[activeUnit]}</h1>
+            </div>
+            <button
+              className={bookmarked ? "lesson-bookmark active" : "lesson-bookmark"}
+              onClick={() => setBookmarked(!bookmarked)}
+            >
+              <Icon name={bookmarked ? "check" : "bookmark"} /> {bookmarked ? "Saved" : "Bookmark"}
+            </button>
+          </div>
+
+          {/* YouTube embed */}
+          <div className="w-full h-[410px] rounded-xl overflow-hidden bg-black shadow-lg border border-[#d6ccbe] relative mb-2">
+            <iframe
+              key={ytId}
+              src={`https://www.youtube.com/embed/${ytId}?rel=0&modestbranding=1`}
+              title={`${course.units[activeUnit]} — Studio Tutorial`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-full border-0"
+            />
+          </div>
+          <div className="flex justify-between items-center text-xs mb-6">
+            <span className="text-[#666] font-medium">Integrated Studio Demonstration</span>
+            <a
+              href={`https://www.youtube.com/watch?v=${ytId}`}
+              target="_blank" rel="noreferrer"
+              className="text-[#c9513e] font-bold flex items-center gap-1 hover:underline"
+            >
+              Watch on YouTube ↗
+            </a>
+          </div>
+
+          {/* Course lesson body */}
+          <div className="lesson-copy">
+            <div>
+              <span className="kicker">UNIT REFERENCE</span>
+              <h2>{course.units[activeUnit]}</h2>
+              <p>Study the video above carefully. Use the reference document and resources below to deepen your understanding before completing the unit exercise and marking it done.</p>
+            </div>
+            <div className="formula-card" style={{ "--card-accent": course.accent } as React.CSSProperties}>
+              <span>CAPSTONE NOTE</span>
+              <strong style={{ fontSize: 14 }}>{course.project}</strong>
+            </div>
+          </div>
+
+          {/* Resources */}
+          <div className="lesson-resources">
+            <h3>Unit resources</h3>
+            <a href={refUrl} target="_blank" rel="noreferrer">
+              <span><Icon name="spark" /></span>
+              <div>
+                <strong>Reference document</strong>
+                <small>{refTitle}</small>
+              </div>
+              <b>↗</b>
+            </a>
+            <a href={`https://www.youtube.com/watch?v=${ytId}`} target="_blank" rel="noreferrer">
+              <span><Icon name="play" /></span>
+              <div>
+                <strong>Watch on YouTube</strong>
+                <small>{course.units[activeUnit]} — full video</small>
+              </div>
+              <b>↗</b>
+            </a>
+            <a href="/vastrashastra-pattern-blueprint.pdf" download>
+              <span><Icon name="ruler" /></span>
+              <div>
+                <strong>Pattern blueprint</strong>
+                <small>PDF · Printable A4 · 182 KB</small>
+              </div>
+              <b>↓</b>
+            </a>
+          </div>
+
+          {/* Mark complete */}
+          {progress[activeUnit] ? (
+            <div className="complete-lesson" style={{ opacity: 0.55, cursor: "default", display: "flex", alignItems: "center", gap: 8 }}>
+              <Icon name="check" /> Unit complete
+            </div>
+          ) : (
+            <button className="complete-lesson" onClick={markComplete}>
+              <Icon name="check" /> Mark unit complete
+            </button>
+          )}
+        </div>
+      </section>
+    </main>
+  )
+}
+
 function App() {
   const [activeModule, setActiveModule] = useState(0)
   const [palette, setPalette] = useState(0)
@@ -547,6 +1099,8 @@ function App() {
   })
   const lesson = colorLessons[palette]
   const moduleProgress = useMemo(() => [72, 34, 12, 0][activeModule], [activeModule])
+  const reveal = useScrollReveal()
+
 
   const showNotice = (message: string) => {
     setNotice(message)
@@ -605,9 +1159,8 @@ function App() {
       {notice && <div className="toast"><Icon name="check" size={16} />{notice}</div>}
 
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="VastraShastra home" onClick={(event) => { event.preventDefault(); goHome() }}>
-          <span className="brand-mark"><span>V</span></span>
-          <span className="brand-name">Vastra<span>Shastra</span><small>The Science &amp; Soul of Indian Couture</small></span>
+        <a className="brand" href="#top" aria-label="VastraKala Labs home" onClick={(event) => { event.preventDefault(); goHome() }}>
+          <BrandLogo variant="header" />
         </a>
         <nav className={menuOpen ? "nav-links open" : "nav-links"} aria-label="Primary navigation">
           <a className={route === "ai-studio" ? "active" : ""} href="#ai-studio" onClick={(event) => { event.preventDefault(); navigate("ai-studio") }}>AI Studio</a>
@@ -616,7 +1169,7 @@ function App() {
           <a className={route === "resources" ? "active" : ""} href="#resources" onClick={(event) => { event.preventDefault(); navigate("resources") }}>Resources</a>
         </nav>
         <div className="header-actions">
-          <button className="profile-widget" onClick={() => navigate("progress")} aria-label="Open student progress">
+          <button className="profile-widget" onClick={() => navigate("profile")} aria-label="Open student profile">
             <span className="streak">7<small>day</small></span>
             <span className="profile-avatar">AS<i>42%</i></span>
           </button>
@@ -629,6 +1182,7 @@ function App() {
           course={currentCourse}
           onBack={() => goHome("courses")}
           onNext={() => openCourse(courses[(courses.indexOf(currentCourse) + 1) % courses.length])}
+          navigate={navigate}
         />
       ) : route.startsWith("placement/") ? (
         <main className="p-6 lg:p-12 max-w-7xl mx-auto">
@@ -659,6 +1213,8 @@ function App() {
         <main className="p-6 lg:p-12 max-w-7xl mx-auto">
           <UnifiedAIStudio />
         </main>
+      ) : route === "profile" ? (
+        <StudentProfile navigate={navigate} />
       ) : route === "progress" || route === "dashboard" || route === "modules" ? (
         <StudentDashboard navigate={navigate} />
       ) : route === "history" ? (
@@ -672,10 +1228,16 @@ function App() {
         <main className="p-6 lg:p-12 max-w-7xl mx-auto">
           <ResourceLibraryView navigate={navigate} />
         </main>
+      ) : route.startsWith("lesson/") ? (
+        <UnitLesson
+          courseSlug={route.replace("lesson/", "").split("/")[0]}
+          unitIndex={Number(route.replace("lesson/", "").split("/")[1]) || 0}
+          navigate={navigate}
+        />
       ) : route.startsWith("module/") ? (
         <ModuleLesson slug={route.replace("module/", "")} navigate={navigate} />
       ) : <main id="top">
-        <section className="hero fade-up">
+        <section className="hero scroll-reveal" ref={reveal}>
           <div className="hero-pattern" aria-hidden="true" />
           <div className="hero-copy">
             <div className="eyebrow"><span>शिल्प से शैली तक</span><i /> From craft to couture</div>
@@ -685,9 +1247,6 @@ function App() {
               <button className="primary-button" onClick={handleBeginJourney}>
                 Begin your journey <Icon name="arrow" />
               </button>
-              <a className="play-button" href="https://www.youtube.com/watch?v=ixXKYSklJb8" target="_blank" rel="noreferrer">
-                <span><Icon name="play" size={17} /></span> See how it works
-              </a>
             </div>
             <div className="hero-proof">
               <div className="avatar-stack"><span>AK</span><span>MS</span><span>RP</span></div>
@@ -712,7 +1271,7 @@ function App() {
           </div>
         </section>
 
-        <section className="learning-section" id="learn">
+        <section className="learning-section scroll-reveal" ref={reveal} id="learn">
           <div className="section-heading">
             <div>
               <span className="kicker">YOUR LEARNING PATH</span>
@@ -754,7 +1313,7 @@ function App() {
         </section>
 
         {/* Test Modes Showcase on Homepage */}
-        <section className="p-6 lg:p-12 max-w-7xl mx-auto fade-up fade-up-delay-1" id="test-modes">
+        <section className="p-6 lg:p-12 max-w-7xl mx-auto scroll-reveal" ref={reveal} id="test-modes">
           <div className="mb-6">
             <span className="kicker">TEST &amp; LEARNING MODES</span>
             <h2 className="text-3xl font-serif text-[#172b2b] mt-1">Pre-Assessment &amp; Continuous Testing</h2>
@@ -768,7 +1327,7 @@ function App() {
           />
         </section>
 
-        <section className="courses-section fade-up fade-up-delay-1" id="courses">
+        <section className="courses-section scroll-reveal" ref={reveal} id="courses">
           <div className="courses-heading">
             <div>
               <span className="kicker light">CORE INDIAN FASHION CURRICULUM</span>
@@ -792,7 +1351,7 @@ function App() {
           </div>
         </section>
 
-        <section className="practice-section" id="practice">
+        <section className="practice-section scroll-reveal" ref={reveal} id="practice">
           <div className="practice-copy">
             <span className="kicker light">INTERACTIVE STUDIO</span>
             <h2>Learn by doing,<br /><em>not just watching.</em></h2>
@@ -826,7 +1385,7 @@ function App() {
           </div>
         </section>
 
-        <section className="story-section" id="stories">
+        <section className="story-section scroll-reveal" ref={reveal} id="stories">
           <div className="story-image">
             <img src="https://images.unsplash.com/photo-1627705954911-940ac915d557?crop=entropy&cs=tinysrgb&fit=crop&fm=jpg&q=85&w=1000" alt="Indian textile artisan surrounded by traditional fabrics" />
           </div>
@@ -845,12 +1404,14 @@ function App() {
 
       <footer id="about">
         <div className="footer-brand">
-          <a className="brand light-brand" href="#top"><span className="brand-mark"><span>V</span></span><span className="brand-name">Vastra<span>Shastra</span></span></a>
-          <p>A digital school for India's design language.</p>
+          <a className="brand light-brand" href="#top">
+            <BrandLogo variant="footer" />
+          </a>
+          <p>A digital school for India's fashion design language.</p>
         </div>
-        <div className="footer-note"><span>CRAFT N CODE 2025</span><p>Designed for D3 Techno-Cultural Fest<br />IIIT Bhubaneswar</p></div>
+        <div className="footer-note"><span>VASTRAKALA LABS 2025</span><p>Fashion Design Learning Platform<br />India</p></div>
         <div className="footer-links"><a href="#ai-studio">AI Studio</a><a href="#progress">Progress</a><a href="#history">History</a><a href="#resources">Resources</a></div>
-        <p className="copyright">© 2025 VastraShastra. Crafted with care in India.</p>
+        <p className="copyright">© 2025 VastraKala Labs. Crafted with care in India.</p>
       </footer>
     </div>
   )
