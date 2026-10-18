@@ -285,3 +285,23 @@ footer { background: #112424; color: #f5efe2; padding: 65px clamp(24px, 7vw, 108
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Scroll fade-up animations */
+@keyframes fadeUpAnim {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up {
+  animation: fadeUpAnim 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.fade-up-delay-1 { animation-delay: 0.15s; }
+.fade-up-delay-2 { animation-delay: 0.3s; }
+.fade-up-delay-3 { animation-delay: 0.45s; }

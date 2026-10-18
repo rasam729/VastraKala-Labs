@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
+import UnifiedAIStudio from "./components/UnifiedAIStudio"
+import ResourceLibraryView from "./components/ResourceLibraryView"
+import ModeSelector from "./components/ModeSelector"
+import TestModeRunner from "./components/TestModeRunner"
+import AttemptHistoryView from "./components/AttemptHistoryView"
 
 type IconName =
   | "arrow"
@@ -199,22 +204,89 @@ function StudentDashboard({ navigate }: { navigate: (path: string) => void }) {
         </div>
         <div className="roadmap-list">
           {learningLevels.map((level, index) => (
-            <article className={openLevel === index ? "roadmap-card open" : "roadmap-card"} key={level.no}>
-              <button className="roadmap-summary" onClick={() => setOpenLevel(openLevel === index ? -1 : index)}>
-                <span className="roadmap-no">{level.progress === 100 ? <Icon name="check" /> : level.no}</span>
-                <span className="roadmap-title"><small>LEVEL {level.no}</small><strong>{level.title}</strong><i>{level.subtitle}</i></span>
-                <span className="roadmap-progress"><span>{level.progress}%</span><i><b style={{ width: `${level.progress}%` }} /></i></span>
-                <span className="roadmap-toggle">{openLevel === index ? "−" : "+"}</span>
-              </button>
-              {openLevel === index && (
-                <div className="roadmap-content">
-                  <ol>{level.lessons.map((lesson, lessonIndex) => <li key={lesson}><span>{lessonIndex + 1}</span>{lesson}{lessonIndex < Math.floor(level.progress / 25) && <Icon name="check" size={15} />}</li>)}</ol>
-                  <button onClick={() => navigate(`module/${index === 0 ? "foundation-textile-science" : index === 1 ? "precision-measurement" : index === 2 ? "blouse-drafting" : "advanced-drapery"}`)}>
-                    {level.progress ? "Continue module" : "Preview module"} <Icon name="arrow" size={17} />
+            <React.Fragment key={level.no}>
+              <article className={openLevel === index ? "roadmap-card open" : "roadmap-card"}>
+                <button className="roadmap-summary" onClick={() => setOpenLevel(openLevel === index ? -1 : index)}>
+                  <span className="roadmap-no">{level.progress === 100 ? <Icon name="check" /> : level.no}</span>
+                  <span className="roadmap-title"><small>LEVEL {level.no}</small><strong>{level.title}</strong><i>{level.subtitle}</i></span>
+                  <span className="roadmap-progress"><span>{level.progress}%</span><i><b style={{ width: `${level.progress}%` }} /></i></span>
+                  <span className="roadmap-toggle">{openLevel === index ? "−" : "+"}</span>
+                </button>
+                {openLevel === index && (
+                  <div className="roadmap-content">
+                    <ol>{level.lessons.map((lesson, lessonIndex) => <li key={lesson}><span>{lessonIndex + 1}</span>{lesson}{lessonIndex < Math.floor(level.progress / 25) && <Icon name="check" size={15} />}</li>)}</ol>
+                    <button onClick={() => navigate(`module/${index === 0 ? "foundation-textile-science" : index === 1 ? "precision-measurement" : index === 2 ? "blouse-drafting" : "advanced-drapery"}`)}>
+                      {level.progress ? "Continue module" : "Preview module"} <Icon name="arrow" size={17} />
+                    </button>
+                  </div>
+                )}
+              </article>
+
+              {/* Milestone Continuous Tests placed between modules */}
+              {index === 0 && (
+                <div className="my-3 p-4 rounded-xl bg-[#faf6ee] border border-[#e5dccf] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#aa7917] tracking-wider block">Continuous Progress Test 01</span>
+                    <strong className="text-sm font-serif text-[#172b2b]">Skin Tone Harmony Checkpoint</strong>
+                    <p className="text-[11px] text-[#666]">Assess WCAG contrast ratios across 3 skin tones before unlocking Level 02.</p>
+                  </div>
+                  <button onClick={() => navigate("test/mode2_skin_tone")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">
+                    Start Checkpoint →
                   </button>
                 </div>
               )}
-            </article>
+
+              {index === 1 && (
+                <div className="my-3 p-4 rounded-xl bg-[#f5eff9] border border-[#dfcee9] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#754058] tracking-wider block">Continuous Progress Test 02</span>
+                    <strong className="text-sm font-serif text-[#172b2b]">Dieline Reverse Engineering Exam</strong>
+                    <p className="text-[11px] text-[#666]">Verify mathematical drafting precision of armhole and dart lines vs AI reference.</p>
+                  </div>
+                  <button onClick={() => navigate("test/mode3_dieline_reverse")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">
+                    Start Checkpoint →
+                  </button>
+                </div>
+              )}
+
+              {index === 2 && (
+                <div className="my-3 p-4 rounded-xl bg-[#edf5f0] border border-[#c4dcce] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#28453c] tracking-wider block">Continuous Progress Test 03</span>
+                    <strong className="text-sm font-serif text-[#172b2b]">Indo-Western Blend &amp; Fusion Challenge</strong>
+                    <p className="text-[11px] text-[#666]">Fuse Kanjeevaram silk weave with structured Parisian tailored architecture.</p>
+                  </div>
+                  <button onClick={() => navigate("test/mode4_blend_fusion")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">
+                    Start Checkpoint →
+                  </button>
+                </div>
+              )}
+
+              {index === 3 && (
+                <>
+                  <div className="my-3 p-4 rounded-xl bg-[#fef7ee] border border-[#fae2c5] flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#c9513e] tracking-wider block">Continuous Progress Test 04</span>
+                      <strong className="text-sm font-serif text-[#172b2b]">Speed Recognition Sprint</strong>
+                      <p className="text-[11px] text-[#666]">10 rapid-fire visual garment identification questions with 60-second timer.</p>
+                    </div>
+                    <button onClick={() => navigate("test/mode5_speed_round")} className="px-4 py-2 bg-[#172b2b] text-white text-xs font-bold rounded-lg hover:bg-[#c9513e] transition-all">
+                      Start Checkpoint →
+                    </button>
+                  </div>
+                  <div className="my-3 p-4 rounded-xl bg-[#172b2b] text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#e8b547] tracking-wider block">Final Capstone Test 05</span>
+                      <strong className="text-base font-serif text-white">Comprehensive Jury Case Study</strong>
+                      <p className="text-[11px] text-[#cad5cf]">Complete client portfolio evaluated across sketch, 3D fit, and dieline accuracy.</p>
+                    </div>
+                    <button onClick={() => navigate("test/mode6_case_study")} className="px-4 py-2 bg-[#e8b547] text-[#172b2b] text-xs font-bold rounded-lg hover:bg-[#d8a436] transition-all">
+                      Begin Capstone Jury →
+                    </button>
+                  </div>
+                </>
+              )}
+            </React.Fragment>
           ))}
         </div>
       </section>
@@ -235,12 +307,20 @@ function StudentDashboard({ navigate }: { navigate: (path: string) => void }) {
 function ModuleLesson({ slug, navigate }: { slug: string; navigate: (path: string) => void }) {
   const level = learningLevels[slug.includes("foundation") ? 0 : slug.includes("blouse") ? 2 : slug.includes("drapery") ? 3 : 1]
   const [bookmarked, setBookmarked] = useState(false)
-  const [playing, setPlaying] = useState(false)
   const [checked, setChecked] = useState([true, true, false, false])
+
+  const videoMap: Record<string, { embed: string; direct: string }> = {
+    "01": { embed: "https://www.youtube.com/embed/ixXKYSklJb8", direct: "https://www.youtube.com/watch?v=ixXKYSklJb8" },
+    "02": { embed: "https://www.youtube.com/embed/q4hR7cGVmAQ", direct: "https://www.youtube.com/watch?v=q4hR7cGVmAQ" },
+    "03": { embed: "https://www.youtube.com/embed/0Fg0tFqmRFk", direct: "https://www.youtube.com/watch?v=0Fg0tFqmRFk" },
+    "04": { embed: "https://www.youtube.com/embed/n0EFxVGFR3w", direct: "https://www.youtube.com/watch?v=n0EFxVGFR3w" },
+  }
+
+  const currentVideo = videoMap[level.no] || { embed: "https://www.youtube.com/embed/q4hR7cGVmAQ", direct: "https://www.youtube.com/watch?v=q4hR7cGVmAQ" }
 
   return (
     <main className="lesson-page">
-      <div className="lesson-breadcrumb"><button onClick={() => navigate("dashboard")}>Dashboard</button><span>/</span><button onClick={() => navigate("modules")}>Modules</button><span>/</span><strong>Level {level.no}</strong></div>
+      <div className="lesson-breadcrumb"><button onClick={() => navigate("progress")}>Progress</button><span>/</span><strong>Level {level.no}</strong></div>
       <section className="lesson-layout">
         <aside className="lesson-sidebar">
           <span className="kicker">LEVEL {level.no}</span><h2>{level.title}</h2>
@@ -252,11 +332,29 @@ function ModuleLesson({ slug, navigate }: { slug: string; navigate: (path: strin
             <div><span className="kicker">LESSON 03 · 18 MINUTES</span><h1>{level.lessons[2]}</h1></div>
             <button className={bookmarked ? "lesson-bookmark active" : "lesson-bookmark"} onClick={() => setBookmarked(!bookmarked)}><Icon name={bookmarked ? "check" : "bookmark"} /> {bookmarked ? "Saved" : "Bookmark"}</button>
           </div>
-          <div className={playing ? "tutorial-player playing" : "tutorial-player"}>
-            <img src={level.no === "03" ? courses[3].image : level.no === "04" ? courses[4].image : courses[1].image} alt="Lesson tutorial workspace" />
-            {!playing ? <button onClick={() => setPlaying(true)}><span><Icon name="play" size={28} /></span><strong>Play studio tutorial</strong><small>18:24 · HD</small></button> : <div className="playing-state"><span className="sound-bars"><i /><i /><i /><i /></span><strong>Tutorial playing</strong><button onClick={() => setPlaying(false)}>Pause</button></div>}
-            <div className="player-timeline"><i style={{ width: playing ? "38%" : "0%" }} /></div>
+
+          {/* Real Embedded YouTube Studio Player */}
+          <div className="w-full h-[410px] rounded-xl overflow-hidden bg-black shadow-lg border border-[#d6ccbe] relative mb-2">
+            <iframe
+              src={currentVideo.embed}
+              title={`${level.title} Studio Tutorial`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="w-full h-full border-0"
+            />
           </div>
+          <div className="flex justify-between items-center text-xs mb-6">
+            <span className="text-[#666] font-medium">Integrated Studio Demonstration</span>
+            <a
+              href={currentVideo.direct}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#c9513e] font-bold flex items-center gap-1 hover:underline"
+            >
+              Watch on YouTube ↗
+            </a>
+          </div>
+
           <div className="lesson-copy">
             <div>
               <span className="kicker">TODAY'S PRINCIPLE</span>
@@ -269,7 +367,7 @@ function ModuleLesson({ slug, navigate }: { slug: string; navigate: (path: strin
             <h3>Lesson resources</h3>
             <a href="/vastrashastra-pattern-blueprint.pdf" download><span><Icon name="ruler" /></span><div><strong>Pattern blueprint</strong><small>PDF · Printable A4 · 182 KB</small></div><b>↓</b></a>
             <a href="/measurement-worksheet.csv" download><span><Icon name="thread" /></span><div><strong>Calculation worksheet</strong><small>CSV · Editable measurement grid</small></div><b>↓</b></a>
-            <a href="https://www.youtube.com/results?search_query=Indian+blouse+pattern+drafting+masterclass" target="_blank" rel="noreferrer"><span><Icon name="play" /></span><div><strong>Curated drafting masterclasses</strong><small>External video tutorials · YouTube</small></div><b>↗</b></a>
+            <a href={currentVideo.direct} target="_blank" rel="noreferrer"><span><Icon name="play" /></span><div><strong>Curated drafting masterclasses</strong><small>External video tutorials · YouTube</small></div><b>↗</b></a>
           </div>
           <button className="complete-lesson" onClick={() => setChecked([true, true, true, false])}><Icon name="check" /> Mark lesson complete</button>
         </div>
@@ -489,6 +587,19 @@ function App() {
     window.setTimeout(() => document.querySelector(`#${section}`)?.scrollIntoView({ behavior: "smooth" }), 0)
   }
 
+  const handleBeginJourney = () => {
+    const placementModes = [
+      "mode1_prompt_to_dress",
+      "mode2_skin_tone",
+      "mode3_dieline_reverse",
+      "mode4_blend_fusion",
+      "mode5_speed_round",
+      "mode6_case_study"
+    ]
+    const randomMode = placementModes[Math.floor(Math.random() * placementModes.length)]
+    navigate(`placement/${randomMode}`)
+  }
+
   return (
     <div className="app-shell">
       {notice && <div className="toast"><Icon name="check" size={16} />{notice}</div>}
@@ -499,14 +610,13 @@ function App() {
           <span className="brand-name">Vastra<span>Shastra</span><small>The Science &amp; Soul of Indian Couture</small></span>
         </a>
         <nav className={menuOpen ? "nav-links open" : "nav-links"} aria-label="Primary navigation">
-          <a className={route === "modules" ? "active" : ""} href="#modules" onClick={(event) => { event.preventDefault(); navigate("modules") }}>Modules</a>
-          <a className={route === "pattern-calculator" ? "active" : ""} href="#pattern-calculator" onClick={(event) => { event.preventDefault(); navigate("pattern-calculator") }}>Pattern calculator</a>
-          <a className={route === "dashboard" ? "active" : ""} href="#dashboard" onClick={(event) => { event.preventDefault(); navigate("dashboard") }}>My progress</a>
-          <a className={route === "studio-notes" ? "active" : ""} href="#studio-notes" onClick={(event) => { event.preventDefault(); navigate("studio-notes") }}>Studio notes</a>
-          <a className={route === "resources" ? "active" : ""} href="#resources" onClick={(event) => { event.preventDefault(); navigate("resources") }}>Resource library</a>
+          <a className={route === "ai-studio" ? "active" : ""} href="#ai-studio" onClick={(event) => { event.preventDefault(); navigate("ai-studio") }}>AI Studio</a>
+          <a className={route === "progress" ? "active" : ""} href="#progress" onClick={(event) => { event.preventDefault(); navigate("progress") }}>Progress</a>
+          <a className={route === "history" ? "active" : ""} href="#history" onClick={(event) => { event.preventDefault(); navigate("history") }}>History</a>
+          <a className={route === "resources" ? "active" : ""} href="#resources" onClick={(event) => { event.preventDefault(); navigate("resources") }}>Resources</a>
         </nav>
         <div className="header-actions">
-          <button className="profile-widget" onClick={() => navigate("dashboard")} aria-label="Open student progress">
+          <button className="profile-widget" onClick={() => navigate("progress")} aria-label="Open student progress">
             <span className="streak">7<small>day</small></span>
             <span className="profile-avatar">AS<i>42%</i></span>
           </button>
@@ -520,28 +630,64 @@ function App() {
           onBack={() => goHome("courses")}
           onNext={() => openCourse(courses[(courses.indexOf(currentCourse) + 1) % courses.length])}
         />
-      ) : route === "dashboard" || route === "modules" ? (
+      ) : route.startsWith("placement/") ? (
+        <main className="p-6 lg:p-12 max-w-7xl mx-auto">
+          <div className="mb-4 bg-[#faf7f0] p-4 rounded-xl border border-[#ded4c3] flex justify-between items-center">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-[#c9513e]">Diagnostic Placement Assessment</span>
+              <h2 className="text-xl font-serif text-[#172b2b]">Starting Assessment for Personalized Roadmap</h2>
+            </div>
+            <button onClick={() => goHome()} className="text-xs font-bold text-[#888] hover:text-[#172b2b]">Exit to Home</button>
+          </div>
+          <TestModeRunner
+            modeId={route.replace("placement/", "")}
+            isTestMode={true}
+            onBack={() => goHome()}
+            onNavigateToModule={(slug) => navigate(`module/${slug}`)}
+          />
+        </main>
+      ) : route.startsWith("test/") || route.startsWith("learn/") ? (
+        <main className="p-6 lg:p-12 max-w-7xl mx-auto">
+          <TestModeRunner
+            modeId={route.replace("test/", "").replace("learn/", "")}
+            isTestMode={route.startsWith("test/")}
+            onBack={() => navigate("progress")}
+            onNavigateToModule={(slug) => navigate(`module/${slug}`)}
+          />
+        </main>
+      ) : route === "ai-studio" ? (
+        <main className="p-6 lg:p-12 max-w-7xl mx-auto">
+          <UnifiedAIStudio />
+        </main>
+      ) : route === "progress" || route === "dashboard" || route === "modules" ? (
         <StudentDashboard navigate={navigate} />
-      ) : route === "studio-notes" || route === "pattern-calculator" ? (
-        <StudioNotes />
+      ) : route === "history" ? (
+        <main className="p-6 lg:p-12 max-w-7xl mx-auto">
+          <AttemptHistoryView
+            onNavigateToModule={(slug) => navigate(`module/${slug}`)}
+            onNavigateToMode={(mId) => navigate(`test/${mId}`)}
+          />
+        </main>
+      ) : route === "resources" || route === "formulas" || route === "pattern-calculator" ? (
+        <main className="p-6 lg:p-12 max-w-7xl mx-auto">
+          <ResourceLibraryView navigate={navigate} />
+        </main>
       ) : route.startsWith("module/") ? (
         <ModuleLesson slug={route.replace("module/", "")} navigate={navigate} />
-      ) : route === "resources" ? (
-        <ResourceLibrary navigate={navigate} />
       ) : <main id="top">
-        <section className="hero">
+        <section className="hero fade-up">
           <div className="hero-pattern" aria-hidden="true" />
           <div className="hero-copy">
             <div className="eyebrow"><span>शिल्प से शैली तक</span><i /> From craft to couture</div>
             <h1>Learn the language<br />of <em>Indian fashion.</em></h1>
             <p>Master design fundamentals, pattern mathematics, colour theory and India's living textile traditions—one thoughtful lesson at a time.</p>
             <div className="hero-actions">
-              <button className="primary-button" onClick={() => document.querySelector("#learn")?.scrollIntoView({ behavior: "smooth" })}>
+              <button className="primary-button" onClick={handleBeginJourney}>
                 Begin your journey <Icon name="arrow" />
               </button>
-              <button className="play-button" onClick={() => showNotice("Welcome film added to your learning queue")}>
+              <a className="play-button" href="https://www.youtube.com/watch?v=ixXKYSklJb8" target="_blank" rel="noreferrer">
                 <span><Icon name="play" size={17} /></span> See how it works
-              </button>
+              </a>
             </div>
             <div className="hero-proof">
               <div className="avatar-stack"><span>AK</span><span>MS</span><span>RP</span></div>
@@ -599,13 +745,30 @@ function App() {
               <p>{activeModule === 0 ? "Discover how simple ratios turn body measurements into balanced, wearable silhouettes." : `Continue building confidence with ${modules[activeModule].subtitle.toLowerCase()} through guided examples and practical exercises.`}</p>
               <div className="lesson-meta"><span><Icon name="clock" size={17} /> 12 min lesson</span><span>•</span><span>{moduleProgress}% complete</span></div>
               <div className="progress-track"><span style={{ width: `${moduleProgress}%` }} /></div>
-              <button className="dark-button" onClick={() => showNotice("Lesson opened—your progress is saved")}>Continue lesson <Icon name="arrow" size={18} /></button>
+              <button className="dark-button" onClick={() => navigate(`module/${activeModule === 0 ? "foundation-textile-science" : activeModule === 1 ? "precision-measurement" : activeModule === 2 ? "blouse-drafting" : "advanced-drapery"}`)}>
+                Continue lesson <Icon name="arrow" size={18} />
+              </button>
             </div>
             <button className={saved ? "save-button saved" : "save-button"} aria-label="Save lesson" onClick={() => setSaved(!saved)}><Icon name={saved ? "check" : "bookmark"} /></button>
           </div>
         </section>
 
-        <section className="courses-section" id="courses">
+        {/* Test Modes Showcase on Homepage */}
+        <section className="p-6 lg:p-12 max-w-7xl mx-auto fade-up fade-up-delay-1" id="test-modes">
+          <div className="mb-6">
+            <span className="kicker">TEST &amp; LEARNING MODES</span>
+            <h2 className="text-3xl font-serif text-[#172b2b] mt-1">Pre-Assessment &amp; Continuous Testing</h2>
+            <p className="text-xs text-[#666] max-w-2xl mt-1">
+              Test your knowledge before or during your learning path. Each mode tests different aspects of silhouette design, skin contrast, and pattern mathematics.
+            </p>
+          </div>
+          <ModeSelector
+            onSelectMode={(mId, isTest) => navigate(`${isTest ? "test" : "learn"}/${mId}`)}
+            onStartPlacement={handleBeginJourney}
+          />
+        </section>
+
+        <section className="courses-section fade-up fade-up-delay-1" id="courses">
           <div className="courses-heading">
             <div>
               <span className="kicker light">CORE INDIAN FASHION CURRICULUM</span>
@@ -672,7 +835,9 @@ function App() {
             <h2>Every thread<br />holds a <em>history.</em></h2>
             <p>Go beyond technique to meet the communities, regions and ideas that give Indian textiles their soul.</p>
             <blockquote>“Bandha is not merely a pattern. It is mathematics, memory and patience tied into every thread.”</blockquote>
-            <button className="outline-button" onClick={() => showNotice("The Odisha Bandha story is now open")}>Explore Odisha Bandha <Icon name="arrow" size={18} /></button>
+            <a className="outline-button inline-flex items-center gap-2" href="https://craftscouncilofindia.org/" target="_blank" rel="noreferrer">
+              Explore Odisha Bandha <Icon name="arrow" size={18} />
+            </a>
           </div>
           <div className="story-index">04<span>STATE STORIES</span></div>
         </section>
@@ -684,7 +849,7 @@ function App() {
           <p>A digital school for India's design language.</p>
         </div>
         <div className="footer-note"><span>CRAFT N CODE 2025</span><p>Designed for D3 Techno-Cultural Fest<br />IIIT Bhubaneswar</p></div>
-        <div className="footer-links"><a href="#modules">Modules</a><a href="#studio-notes">Studio</a><a href="#resources">Resources</a></div>
+        <div className="footer-links"><a href="#ai-studio">AI Studio</a><a href="#progress">Progress</a><a href="#history">History</a><a href="#resources">Resources</a></div>
         <p className="copyright">© 2025 VastraShastra. Crafted with care in India.</p>
       </footer>
     </div>
